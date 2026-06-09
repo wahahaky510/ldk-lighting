@@ -1,0 +1,1553 @@
+﻿<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>LDK照明シミュレーター</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#f5f5f2;--surface:#fff;--surface2:#f0f0ec;
+  --border:rgba(0,0,0,0.09);--border2:rgba(0,0,0,0.16);
+  --text:#1a1a1a;--text2:#555;--text3:#999;
+  --accent:#2563eb;--accent-bg:#eff6ff;--accent-text:#1d4ed8;
+  --success:#16a34a;--success-bg:#f0fdf4;--success-border:#86efac;
+  --warn:#d97706;--danger:#dc2626;
+  --room:#000000;--wall:rgba(100,130,220,0.5);
+}
+@media(prefers-color-scheme:dark){:root{
+  --bg:#0e0e12;--surface:#18181f;--surface2:#202028;
+  --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.14);
+  --text:#e8e8f0;--text2:#9090b0;--text3:#505068;
+  --accent:#3b82f6;--accent-bg:#1a2540;--accent-text:#93c5fd;
+  --success:#22c55e;--success-bg:#0c1f0f;--success-border:#166534;
+  --warn:#f59e0b;--danger:#f87171;
+  --room:#14141a;--wall:rgba(80,130,230,0.45);
+}}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans','Yu Gothic UI',sans-serif;font-size:13px}
+.app{display:flex;flex-direction:column;height:100%}
+.header{display:flex;align-items:center;gap:8px;padding:9px 14px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0}
+.header-title{font-size:14px;font-weight:600}
+.header-sub{font-size:10px;color:var(--text3);margin-top:1px}
+.hstats{margin-left:auto;display:flex;gap:5px}
+.chip{font-size:11px;padding:3px 8px;border-radius:20px;background:var(--surface2);color:var(--text2);border:1px solid var(--border)}
+.tabbar{display:flex;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;overflow-x:auto}
+.tabbar::-webkit-scrollbar{display:none}
+.tab{padding:9px 13px;font-size:12px;color:var(--text3);border:none;background:transparent;border-bottom:2px solid transparent;white-space:nowrap;cursor:pointer;flex-shrink:0}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:500}
+#canvasTab{flex:1;overflow:hidden;display:flex;flex-direction:column}
+.canvas-wrap{flex:1;display:flex;padding:6px;overflow:hidden}
+canvas#main{flex:1;min-width:0;min-height:0;border-radius:8px;border:1px solid var(--border);touch-action:none;display:block}
+canvas#main.add-mode{cursor:crosshair}
+.btm{background:var(--surface);border-top:1px solid var(--border);flex-shrink:0}
+.btm-tog{display:flex;align-items:center;justify-content:space-between;padding:9px 14px;cursor:pointer;user-select:none}
+.btm-tog-title{font-size:12px;font-weight:500;color:var(--text2)}
+.arr{font-size:14px;color:var(--text3);transition:transform .2s}
+.arr.open{transform:rotate(180deg)}
+.btm-body{overflow-y:auto;max-height:0;transition:max-height .25s ease}
+.btm-body.open{max-height:300px}
+.bsec{padding:9px 13px;border-bottom:1px solid var(--border)}
+.blbl{font-size:10px;color:var(--text3);letter-spacing:.09em;text-transform:uppercase;margin-bottom:7px}
+.row{display:flex;align-items:center;gap:7px;margin-bottom:6px}
+.row label{font-size:11px;color:var(--text2);width:44px;flex-shrink:0}
+.row input[type=range]{flex:1;accent-color:var(--accent)}
+.row .val{font-size:11px;min-width:40px;text-align:right}
+select{width:100%;padding:6px 9px;border-radius:9px;border:1px solid var(--border2);background:var(--surface2);color:var(--text);font-size:12px;margin-bottom:6px;outline:none}
+.btn{padding:6px 11px;border-radius:9px;border:1px solid var(--border2);background:var(--surface2);color:var(--text);font-size:12px;cursor:pointer;text-align:center}
+.btn.active{background:var(--accent-bg);color:var(--accent-text);border-color:var(--accent)}
+.btn.sm{font-size:11px;padding:4px 8px}
+.btn.danger{background:#fff0f0;color:var(--danger);border-color:#fca5a5}
+@media(prefers-color-scheme:dark){.btn.danger{background:#2a1010;border-color:#7f1d1d}}
+.brow{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:6px}
+canvas#shapeMap{border-radius:6px;border:1px solid var(--border);display:block;width:100%;height:80px}
+.shape-hint{font-size:10px;color:var(--text3);margin-top:3px}
+#listTab,#statsTab,#settingsTab{flex:1;overflow-y:auto;display:none;padding:0}
+.ltbl{width:100%;border-collapse:collapse;font-size:12px}
+.ltbl th{padding:6px 9px;text-align:left;color:var(--text3);font-weight:400;font-size:10px;border-bottom:1px solid var(--border);white-space:nowrap;position:sticky;top:0;background:var(--surface)}
+.ltbl td{padding:6px 9px;border-bottom:1px solid var(--border)}
+.ltbl tr.sel td{background:var(--accent-bg)}
+.ltbl tfoot td{font-weight:500;color:var(--text2)}
+.stats-wrap{padding:10px 13px}
+.scards{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px}
+.scard{background:var(--surface2);border-radius:11px;padding:9px 11px}
+.scard .lbl{font-size:10px;color:var(--text3);margin-bottom:3px}
+.scard .val{font-size:19px;font-weight:600}
+.scard .sub{font-size:10px;color:var(--text2);margin-top:2px}
+.stbl-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);font-size:11px;gap:4px}
+.stbl-row:last-child{border-bottom:none}
+.stbl-row .name{color:var(--text2);flex:1;min-width:0}
+.stbl-row .range{color:var(--text3);white-space:nowrap}
+.stbl-row .status{white-space:nowrap;font-weight:500}
+.ok{color:var(--success)}.warn-c{color:var(--warn)}.bad{color:var(--danger)}
+.sec-title{font-size:10px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin:12px 0 7px}
+.daiko-wrap{padding:9px 13px;border-top:1px solid var(--border)}
+.daiko-row{display:flex;gap:5px}
+.daiko-row input{flex:1;padding:6px 9px;border-radius:9px;border:1px solid var(--border2);background:var(--surface2);color:var(--text);font-size:12px;outline:none;font-family:monospace}
+.daiko-res{margin-top:5px;font-size:11px;padding:6px 9px;border-radius:9px;background:var(--surface2);color:var(--text2);min-height:28px;line-height:1.6}
+.sel-panel{padding:9px 13px;border-top:1px solid var(--border);background:var(--accent-bg);display:none}
+.sel-info{font-size:11px;color:var(--accent-text);line-height:1.8;margin-bottom:7px}
+/* Zone tab for stats */
+.zone-tabs{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px}
+.ztab{padding:4px 10px;border-radius:20px;border:1px solid var(--border2);background:var(--surface2);color:var(--text2);font-size:11px;cursor:pointer}
+.ztab.active{background:var(--accent-bg);color:var(--accent-text);border-color:var(--accent)}
+.zone-color-K{color:#059669}.zone-color-D{color:#2563eb}.zone-color-L{color:#9333ea}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <span>💡</span>
+    <div><div class="header-title">LDK照明シミュレーター</div><div class="header-sub">L字間取り / エリア別照度 / DAIKO型番</div></div>
+    <div class="hstats"><span class="chip" id="hW">—W</span><span class="chip" id="hLx">— lx</span></div>
+  </div>
+  <div class="tabbar">
+    <button class="tab active" onclick="setTab('canvas',this)">📐 平面図</button>
+    <button class="tab" onclick="setTab('list',this)">📋 器具リスト</button>
+    <button class="tab" onclick="setTab('stats',this)">📊 照度分析</button>
+    <button class="tab" onclick="setTab('settings',this)">⚙ 設定</button>
+  </div>
+
+  <div id="canvasTab">
+    <div class="canvas-wrap"><canvas id="main"></canvas></div>
+    <div class="btm">
+      <div class="btm-tog" onclick="toggleBtm()">
+        <span class="btm-tog-title" id="btmTitle">⚙ 設定・器具追加・家具配置</span>
+        <span class="arr" id="btmArr">▲</span>
+      </div>
+      <div class="btm-body" id="btmBody">
+
+        <!-- Shape -->
+        <div class="bsec">
+          <div class="blbl">間取りサイズ</div>
+          <canvas id="shapeMap"></canvas>
+          <div style="margin-top:6px">
+            <div class="row"><label>全幅W</label><input type="range" id="roomW" min="1" max="20" step="0.01" value="9.5" oninput="shape.w=Math.max(parseFloat(this.value),shape.nx+0.5);roomWVal.textContent=shape.w.toFixed(2)+'m';drawShapeMap();redraw();updateHStats()"><span class="val" id="roomWVal">9.50m</span></div>
+            <div class="row"><label>全高H</label><input type="range" id="roomH" min="1" max="15" step="0.01" value="5.5" oninput="shape.h=Math.max(parseFloat(this.value),shape.ny+0.5);roomHVal.textContent=shape.h.toFixed(2)+'m';drawShapeMap();redraw();updateHStats()"><span class="val" id="roomHVal">5.50m</span></div>
+            <div class="row"><label>切欠X</label><input type="range" id="roomNX" min="0.5" max="19" step="0.01" value="5.5" oninput="shape.nx=Math.min(parseFloat(this.value),shape.w-0.01);roomNXVal.textContent=shape.nx.toFixed(2)+'m';drawShapeMap();redraw();updateHStats()"><span class="val" id="roomNXVal">5.50m</span></div>
+            <div class="row"><label>切欠Y</label><input type="range" id="roomNY" min="0.5" max="14" step="0.01" value="3.5" oninput="shape.ny=Math.min(parseFloat(this.value),shape.h-0.01);roomNYVal.textContent=shape.ny.toFixed(2)+'m';drawShapeMap();redraw();updateHStats()"><span class="val" id="roomNYVal">3.50m</span></div>
+          </div>
+          <div class="shape-hint" id="orientHint">全幅W×全高H の矩形から右下を切り欠いたL字</div>
+          <div style="display:flex;gap:5px;margin-top:7px;flex-wrap:wrap">
+            <button class="btn sm" onclick="rotateOrient(1)">↻ 90°</button>
+            <button class="btn sm" onclick="rotateOrient(-1)">↺ 90°</button>
+            <button class="btn sm" onclick="flipOrientH()">⇄ 左右</button>
+            <button class="btn sm" onclick="flipOrientV()">⇅ 上下</button>
+          </div>
+        </div>
+
+        <!-- Ceiling -->
+        <div class="bsec">
+          <div class="blbl">天井高</div>
+          <div class="row"><label>天井高</label><input type="range" id="ceilH" min="2.0" max="3.2" step="0.05" value="2.4" oninput="ceilHVal.textContent=parseFloat(this.value).toFixed(2)+'m';redraw();updateHStats()"><span class="val" id="ceilHVal">2.40m</span></div>
+        </div>
+
+        <!-- Scene -->
+        <div class="bsec">
+          <div class="blbl">シーン</div>
+          <div class="brow" id="sceneBtns"></div>
+        </div>
+        <div class="bsec">
+          <div class="blbl">グリッド</div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <button class="btn sm active" id="gridToggleBtn" onclick="toggleGrid910()" style="min-width:80px">910mm ON</button>
+            <span style="font-size:10px;color:var(--text3)">1マス = 910mm（尺モジュール）</span>
+          </div>
+        </div>
+
+        <!-- Zones -->
+        <div class="bsec">
+          <div class="blbl">エリア管理</div>
+          <div style="display:flex;gap:5px;margin-bottom:7px">
+            <input type="text" id="newZoneName" placeholder="エリア名 例: L-1" style="flex:1;padding:6px 9px;border-radius:9px;border:1px solid var(--border2);background:var(--surface2);color:var(--text);font-size:12px;outline:none">
+            <select id="newZoneBase" style="width:70px;margin:0">
+              <option value="K">K</option><option value="D">D</option><option value="L" selected>L</option>
+            </select>
+            <button class="btn sm" onclick="addZoneArea()">＋追加</button>
+          </div>
+          <div class="brow" id="zoneAreaBtns"></div>
+        </div>
+
+        <!-- Add fixture -->
+        <div class="bsec">
+          <div class="blbl">照明器具追加</div>
+          <select id="presetSel"></select>
+          <div style="display:flex;gap:5px;margin-bottom:6px">
+            <select id="fixZoneSel" style="flex:1;margin:0"></select>
+            <button class="btn sm active" id="addBtn" onclick="toggleAdd()">＋ 配置</button>
+          </div>
+        </div>
+
+        <!-- Furniture -->
+        <div class="bsec">
+          <div class="blbl">家具配置（タップで追加、ドラッグで移動）</div>
+          <div class="brow" id="furnitureBtns"></div>
+        </div>
+
+        <!-- DAIKO -->
+        <div class="daiko-wrap">
+          <div class="blbl">DAIKO型番検索</div>
+          <div class="daiko-row">
+            <input type="text" id="daikoIn" placeholder="例: DDL-5121" maxlength="20">
+            <button class="btn" onclick="searchDaiko()">検索</button>
+          </div>
+          <div class="daiko-res" id="daikoRes">型番を入力して検索 → 選択中の器具に反映</div>
+        </div>
+
+        <!-- Selected -->
+        <div class="sel-panel" id="selPanel">
+          <div class="sel-info" id="selInfo"></div>
+          <button class="btn danger" onclick="deleteSelected()" style="width:100%">🗑 削除</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="listTab"><table class="ltbl"><thead><tr><th>記号</th><th>種別</th><th>型番</th><th style="text-align:right">lm</th><th style="text-align:right">W</th><th>エリア</th></tr></thead><tbody id="lbody"></tbody><tfoot id="lfoot"></tfoot></table></div>
+
+  <div id="statsTab"><div class="stats-wrap" id="statsWrap"></div></div>
+
+  <div id="settingsTab">
+    <div class="stats-wrap">
+      <div class="sec-title">照度マップ カラー設定</div>
+
+      <div style="margin-bottom:14px">
+        <div style="font-size:11px;color:var(--text2);margin-bottom:7px">カラーモード</div>
+        <div style="display:flex;gap:6px">
+          <button class="btn sm active" id="modeWarm" onclick="setHeatMode('warm')">🔥 電球色</button>
+          <button class="btn sm" id="modeFalse" onclick="setHeatMode('false')">🌈 偽色（ヒートマップ）</button>
+        </div>
+      </div>
+
+      <div style="margin-bottom:14px">
+        <div style="font-size:11px;color:var(--text2);margin-bottom:4px">
+          スケール上限: <b id="maxLuxVal">500</b> lx
+          <span style="font-size:10px;color:var(--text3);margin-left:4px">この値で最大輝度になる</span>
+        </div>
+        <input type="range" id="maxLuxSlider" min="100" max="2000" step="50" value="500"
+          style="width:100%;accent-color:var(--accent)" oninput="setMaxLux(this.value)">
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-top:2px">
+          <span>100</span><span>500</span><span>1000</span><span>1500</span><span>2000 lx</span>
+        </div>
+      </div>
+
+      <div style="margin-bottom:6px">
+        <div style="font-size:11px;color:var(--text2);margin-bottom:6px">凡例</div>
+        <canvas id="legendCanvas" height="36" style="width:100%;border-radius:7px;display:block"></canvas>
+        <div id="legendLabels" style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-top:3px"></div>
+      </div>
+
+      <div style="background:var(--surface2);border-radius:10px;padding:9px 11px;margin-top:12px">
+        <div style="font-size:10px;color:var(--text3);line-height:1.8">
+          <b style="color:var(--text2)">スケール上限の目安</b><br>
+          キッチン作業: 200〜500 lx ／ ダイニング: 150〜300 lx<br>
+          リビング: 75〜150 lx ／ くつろぎ: 30〜75 lx
+        </div>
+      </div>
+
+      <div class="sec-title" style="margin-top:16px">設定の保存・読み込み</div>
+
+      <div style="background:var(--surface2);border-radius:10px;padding:9px 11px;margin-bottom:8px">
+        <div style="font-size:11px;color:var(--text2);margin-bottom:3px">自動保存</div>
+        <div style="font-size:10px;color:var(--text3)">間取り・器具・ゾーン・カラー設定はブラウザに自動保存されます。次回開いたときに前回の状態から再開します。</div>
+        <button class="btn sm" style="margin-top:7px;color:var(--danger);border-color:var(--danger)" onclick="if(confirm('自動保存データを削除して初期状態に戻しますか？')){localStorage.removeItem('ldkSim_v2');location.reload();}">🗑 自動保存をリセット</button>
+      </div>
+
+      <div style="background:var(--surface2);border-radius:10px;padding:9px 11px">
+        <div style="font-size:11px;color:var(--text2);margin-bottom:7px">ファイルへの書き出し / 読み込み</div>
+        <div style="display:flex;gap:6px">
+          <button class="btn sm active" onclick="exportState()" style="flex:1">⬇ JSONで書き出し</button>
+          <button class="btn sm" onclick="importState()" style="flex:1">⬆ JSONを読み込み</button>
+        </div>
+        <div style="font-size:10px;color:var(--text3);margin-top:6px">書き出したJSONファイルを別のブラウザ・PCで読み込むことができます。</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== Data =====
+const PRESETS=[
+  {id:"dl_s",name:"ダウンライト φ75",lm:450,w:6,r:0.85},
+  {id:"dl_m",name:"ダウンライト φ100",lm:800,w:9,r:1.2},
+  {id:"dl_l",name:"ダウンライト φ150",lm:1500,w:15,r:1.7},
+  {id:"pendant",name:"ペンダント",lm:1200,w:12,r:1.5,heightAdjustable:true,defaultHeight:1.6,heightMin:0.6,heightMax:2.4},
+  {id:"spot",name:"スポットライト",lm:600,w:8,r:0.85},
+  {id:"linear",name:"ラインライト",lm:900,w:10,r:1.1},
+  {id:"bracket",name:"ブラケット",lm:400,w:5,r:0.75},
+  {id:"ceiling",name:"シーリング",lm:4000,w:40,r:2.8},
+  {id:"ph5",name:"PH5(ルイスポールセン)",lm:1100,w:60,r:1.9,warmBias:1.5,heightAdjustable:true,defaultHeight:1.6,heightMin:0.6,heightMax:2.4},
+  {id:"floor_stand",name:"スタンドライト(直接)",lm:650,w:10,r:1.0,warmBias:1.2,heightAdjustable:true,defaultHeight:1.2,heightMin:0.4,heightMax:1.8},
+  {id:"floor_indirect",name:"スタンドライト(間接)",lm:350,w:7,r:0.75,warmBias:1.6,heightAdjustable:true,defaultHeight:1.4,heightMin:0.4,heightMax:1.8},
+  {id:"gl_30",name:"グレアレスDL 30°",lm:800,w:9,r:0.65,beamAngle:30,beamType:"glare_narrow"},
+  {id:"gl_50",name:"グレアレスDL 50°",lm:800,w:9,r:1.1,beamAngle:50,beamType:"glare_wide"},
+  {id:"sgl_30",name:"ソフトグレアレスDL 30°",lm:750,w:9,r:0.7,beamAngle:30,beamType:"soft_glare"},
+  {id:"sgl_50",name:"ソフトグレアレスDL 50°",lm:750,w:9,r:1.1,beamAngle:50,beamType:"soft_glare_wide"},
+];
+const SCENES=[
+  {id:"all",name:"全灯",mult:1.0,zones:null},
+  {id:"dining",name:"ダイニング",mult:1.0,zones:["D"]},
+  {id:"relax",name:"くつろぎ",mult:0.35,zones:null},
+  {id:"work",name:"作業",mult:1.0,zones:["K","D"]},
+];
+const FURNITURE_DEFS=[
+  {id:"tv",name:"テレビ",w:1.4,d:0.06,icon:"tv"},
+  {id:"sofa",name:"ソファ",w:2.0,d:0.85,icon:"sofa"},
+  {id:"kitchen",name:"キッチン",w:2.55,d:0.65,icon:"kitchen"},
+  {id:"cupboard",name:"カップボード",w:1.8,d:0.5,icon:"cupboard"},
+  {id:"table",name:"ダイニングテーブル",w:1.6,d:0.9,icon:"table"},
+  {id:"bed",name:"ベッド",w:1.6,d:2.0,icon:"bed"},
+  {id:"sofa_l",name:"L字ソファ",w:2.6,d:1.6,icon:"sofa_l"},
+];
+
+// Shape: 2 rects forming L
+let shape={w:9.5,h:5.5,nx:5.5,ny:3.5};  // L字: nx=切り欠きX, ny=切り欠きY
+
+// Zones: {id, name, base (K/D/L), color}
+let zones=[
+  {id:"K",name:"K",base:"K",color:"#059669",area:null},  // null=自動計算
+  {id:"D",name:"D",base:"D",color:"#2563eb",area:null},
+  {id:"L",name:"L",base:"L",color:"#9333ea",area:null},
+];
+
+let fixtures=[
+  {id:1,presetId:"dl_m",x:1.2,y:0.8,zone:"K",label:"K-1",model:""},
+  {id:2,presetId:"dl_m",x:2.8,y:0.8,zone:"K",label:"K-2",model:""},
+  {id:3,presetId:"pendant",x:5.5,y:2.0,zone:"D",label:"D-1",model:""},
+  {id:4,presetId:"dl_l",x:7.5,y:1.0,zone:"L",label:"L-1",model:""},
+  {id:5,presetId:"dl_l",x:8.5,y:3.5,zone:"L",label:"L-2",model:""},
+];
+
+let furniture=[]; // {id,defId,x,y,rot:0|90|180|270}
+
+let heatConfig={maxLux:500,mode:'warm'};
+let densityUnit='m2'; // 'm2' | 'tatami'
+const TATAMI=1.65;   // 1畳 = 1.65m²
+let nextId=20,nextFId=10;
+let selectedId=null,selectedFId=null; // fixture or furniture selected
+let addMode=false,addFurMode=null; // addFurMode = defId string
+let addZoneId="L";
+let activeScene="all",curTab="canvas";
+let dragging=null,furDragging=null,shapeDrag=null,btmOpen=false;
+let showGrid910=true;
+let statsZone="ALL";
+
+// ===== Shape helpers =====
+function sb(){
+  return{minX:0,maxX:shape.w,minY:0,maxY:shape.h,totalW:shape.w,totalH:shape.h};
+}
+// L字ポリゴンパスを生成（clipping・描画共用）orient対応
+function lPath(ctx2,tx,ty){
+  const S=shape,or=S.orient||0;
+  ctx2.beginPath();
+  if(or===0){      // 右下切欠
+    ctx2.moveTo(tx(0),      ty(0));
+    ctx2.lineTo(tx(S.w),    ty(0));
+    ctx2.lineTo(tx(S.w),    ty(S.ny));
+    ctx2.lineTo(tx(S.nx),   ty(S.ny));
+    ctx2.lineTo(tx(S.nx),   ty(S.h));
+    ctx2.lineTo(tx(0),      ty(S.h));
+  } else if(or===1){ // 左下切欠
+    ctx2.moveTo(tx(0),      ty(S.ny));
+    ctx2.lineTo(tx(S.w-S.nx),ty(S.ny));
+    ctx2.lineTo(tx(S.w-S.nx),ty(0));
+    ctx2.lineTo(tx(S.w),    ty(0));
+    ctx2.lineTo(tx(S.w),    ty(S.h));
+    ctx2.lineTo(tx(0),      ty(S.h));
+  } else if(or===2){ // 左上切欠
+    ctx2.moveTo(tx(S.w-S.nx),ty(0));
+    ctx2.lineTo(tx(S.w),    ty(0));
+    ctx2.lineTo(tx(S.w),    ty(S.h));
+    ctx2.lineTo(tx(0),      ty(S.h));
+    ctx2.lineTo(tx(0),      ty(S.h-S.ny));
+    ctx2.lineTo(tx(S.w-S.nx),ty(S.h-S.ny));
+  } else {           // 3: 右上切欠
+    ctx2.moveTo(tx(0),      ty(0));
+    ctx2.lineTo(tx(S.nx),   ty(0));
+    ctx2.lineTo(tx(S.nx),   ty(S.h-S.ny));
+    ctx2.lineTo(tx(S.w),    ty(S.h-S.ny));
+    ctx2.lineTo(tx(S.w),    ty(S.h));
+    ctx2.lineTo(tx(0),      ty(S.h));
+  }
+  ctx2.closePath();
+}
+function isInside(rx,ry){
+  if(rx<0||rx>shape.w||ry<0||ry>shape.h) return false;
+  const S=shape,or=S.orient||0;
+  if(or===0 && rx>=S.nx && ry>=S.ny) return false;
+  if(or===1 && rx<=(S.w-S.nx) && ry>=S.ny) return false;
+  if(or===2 && rx<=(S.w-S.nx) && ry<=(S.h-S.ny)) return false;
+  if(or===3 && rx>=S.nx && ry<=(S.h-S.ny)) return false;
+  return true;
+}
+function getPreset(id){return PRESETS.find(p=>p.id===id)||PRESETS[1]}
+function getZone(id){return zones.find(z=>z.id===id)||zones[0]}
+function isDark(){return window.matchMedia("(prefers-color-scheme:dark)").matches}
+
+// ===== Zone colors =====
+const ZONE_BASE_COLORS={K:"#059669",D:"#2563eb",L:"#9333ea"};
+const ZONE_EXTRA_COLORS=["#db2777","#ea580c","#0891b2","#65a30d","#7c3aed","#b45309"];
+let zoneColorIdx=0;
+
+// ===== Shape minimap =====
+function initShapeMap(){
+  const W=(document.getElementById("shapeMap").parentElement.clientWidth-26)*2;
+  const sc=document.getElementById("shapeMap");
+  sc.width=W;sc.height=160;sc.style.width=((W/2))+"px";sc.style.height="80px";
+  drawShapeMap();
+}
+function drawShapeMap(){
+  const sc=document.getElementById("shapeMap");
+  const W=sc.width,H=sc.height,PAD=22;
+  const sCtx=sc.getContext("2d");
+  sCtx.clearRect(0,0,W,H);
+  const b=sb();
+  const sc2=Math.min((W-PAD*2)/b.totalW,(H-PAD*2)/b.totalH);
+  const ox=PAD+(W-PAD*2-b.totalW*sc2)/2-b.minX*sc2;
+  const oy=PAD+(H-PAD*2-b.totalH*sc2)/2-b.minY*sc2;
+  const tx=x=>ox+x*sc2, ty=y=>oy+y*sc2;
+  const S=shape;
+
+  // L字塗り・枠
+  sCtx.fillStyle="rgba(59,130,246,0.12)";
+  sCtx.strokeStyle="rgba(100,150,255,0.6)";sCtx.lineWidth=1.5;
+  lPath(sCtx,tx,ty);sCtx.fill();
+  lPath(sCtx,tx,ty);sCtx.stroke();
+
+  // ゾーン境界（点線）
+  const kx=S.w*0.22, dxE=S.w*0.52;
+  sCtx.strokeStyle="rgba(255,255,255,0.15)";sCtx.setLineDash([4,3]);sCtx.lineWidth=1;
+  // K/D境界
+  sCtx.beginPath();sCtx.moveTo(tx(kx),ty(0));sCtx.lineTo(tx(kx),ty(Math.min(S.ny,S.h)));sCtx.stroke();
+  // D/L境界
+  sCtx.beginPath();sCtx.moveTo(tx(dxE),ty(0));sCtx.lineTo(tx(dxE),ty(Math.min(S.ny,S.h)));sCtx.stroke();
+  sCtx.setLineDash([]);
+
+  // ゾーンラベル
+  sCtx.fillStyle="rgba(200,215,255,0.75)";sCtx.font=(10*2)+"px -apple-system,sans-serif";
+  sCtx.fillText("K",tx(kx/2)-6,ty(S.h/2)+5);
+  sCtx.fillText("D",tx((kx+dxE)/2)-6,ty(S.h/2)+5);
+  sCtx.fillText("L",tx((dxE+S.nx)/2+S.w*0.1)-6,ty(S.h*0.35)+5);
+
+  // 寸法テキスト
+  const dimC="rgba(220,230,255,0.9)";
+  sCtx.fillStyle=dimC;sCtx.strokeStyle="rgba(220,230,255,0.4)";
+  sCtx.lineWidth=0.8;sCtx.font=(8*2)+"px monospace";
+  const sdm=(x1,y1,x2,y2,label,horiz)=>{
+    const mx=(x1+x2)/2,my=(y1+y2)/2;
+    sCtx.beginPath();sCtx.moveTo(x1,y1);sCtx.lineTo(x2,y2);sCtx.stroke();
+    const tw=sCtx.measureText(label).width;
+    sCtx.fillStyle=dimC;
+    if(horiz)sCtx.fillText(label,mx-tw/2,my-3);
+    else{sCtx.save();sCtx.translate(mx,my);sCtx.rotate(-Math.PI/2);sCtx.fillText(label,-tw/2,-3);sCtx.restore();}
+  };
+  const OFF=10;
+  sdm(tx(0),ty(0)-OFF,tx(S.w),ty(0)-OFF,S.w.toFixed(2)+"m",true);
+  sdm(tx(0)-OFF,ty(0),tx(0)-OFF,ty(S.h),S.h.toFixed(2)+"m",false);
+  sdm(tx(S.nx),ty(S.h)+OFF,tx(0),ty(S.h)+OFF,S.nx.toFixed(2)+"m",true);
+  sdm(tx(S.w)+OFF,ty(0),tx(S.w)+OFF,ty(S.ny),S.ny.toFixed(2)+"m",false);
+  sdm(tx(S.w),ty(S.ny)+OFF*0.7,tx(S.nx),ty(S.ny)+OFF*0.7,(S.w-S.nx).toFixed(2)+"m",true);
+  sdm(tx(S.nx)+OFF,ty(S.ny),tx(S.nx)+OFF,ty(S.h),(S.h-S.ny).toFixed(2)+"m",false);
+
+  // コントロールポイント（L字の6頂点）
+  const {sc2:ssc,ox:oox,oy:ooy}=getSmScale();
+  const pts=[
+    {name:"w_ny",  sx:oox+S.w*ssc,  sy:ooy+S.ny*ssc, label:"右上"},
+    {name:"nx_ny", sx:oox+S.nx*ssc, sy:ooy+S.ny*ssc, label:"内角"},
+    {name:"nx_h",  sx:oox+S.nx*ssc, sy:ooy+S.h*ssc,  label:"左下内"},
+    {name:"w_h",   sx:oox+S.w*ssc,  sy:ooy+S.h*ssc,  label:"右下"},  // 実際にはL字なので不使用
+  ];
+  // 操作可能な点: 右上(w,ny)・内角(nx,ny)・左下内(nx,h)・右下外(w,0)
+  const ctrlPts=[
+    {name:"tr",   sx:oox+S.w*ssc,  sy:ooy},
+    {name:"r_ny", sx:oox+S.w*ssc,  sy:ooy+S.ny*ssc},
+    {name:"nx_ny",sx:oox+S.nx*ssc, sy:ooy+S.ny*ssc},
+    {name:"nx_h", sx:oox+S.nx*ssc, sy:ooy+S.h*ssc},
+    {name:"bl",   sx:oox,          sy:ooy+S.h*ssc},
+  ];
+  ctrlPts.forEach(pt=>{
+    sCtx.beginPath();sCtx.arc(pt.sx,pt.sy,7,0,Math.PI*2);
+    sCtx.fillStyle="rgba(80,160,255,0.85)";sCtx.fill();
+  });
+}
+function getSmScale(){
+  const sc=document.getElementById("shapeMap");
+  const W=sc.width,H=sc.height,PAD=22;
+  const b=sb();
+  const sc2=Math.min((W-PAD*2)/b.totalW,(H-PAD*2)/b.totalH);
+  const ox=PAD+(W-PAD*2-b.totalW*sc2)/2-b.minX*sc2;
+  const oy=PAD+(H-PAD*2-b.totalH*sc2)/2-b.minY*sc2;
+  return{sc2,ox,oy};
+}
+function getCPs(sc2,ox,oy){
+  const S=shape;
+  return[
+    {name:"tr",   sx:ox+S.w*sc2,  sy:oy},
+    {name:"r_ny", sx:ox+S.w*sc2,  sy:oy+S.ny*sc2},
+    {name:"nx_ny",sx:ox+S.nx*sc2, sy:oy+S.ny*sc2},
+    {name:"nx_h", sx:ox+S.nx*sc2, sy:oy+S.h*sc2},
+    {name:"bl",   sx:ox,          sy:oy+S.h*sc2},
+  ];
+}
+function smEvtXY(e){
+  const sc=document.getElementById("shapeMap");
+  const r=sc.getBoundingClientRect();
+  const src=e.touches?e.touches[0]:e;
+  return{mx:(src.clientX-r.left)*(sc.width/r.width),my:(src.clientY-r.top)*(sc.height/r.height)};
+}
+function smDown(e){
+  e.preventDefault();
+  const{mx,my}=smEvtXY(e);
+  const{sc2,ox,oy}=getSmScale();
+  for(const pt of getCPs(sc2,ox,oy)){
+    if(Math.hypot(mx-pt.sx,my-pt.sy)<16){shapeDrag={name:pt.name,sc2,ox,oy};return;}
+  }
+}
+const ORIENT_LABELS=["右下切欠","左下切欠","左上切欠","右上切欠"];
+function updateOrientHint(){
+  const el=document.getElementById("orientHint");
+  if(el)el.textContent="切り欠き: "+ORIENT_LABELS[shape.orient||0]+" / ドラッグで調整";
+}
+function rotateOrient(dir){
+  shape.orient=((shape.orient||0)+dir+4)%4;
+  updateOrientHint();drawShapeMap();redraw();updateHStats();
+}
+function flipOrientH(){
+  shape.orient=[1,0,3,2][shape.orient||0];
+  updateOrientHint();drawShapeMap();redraw();updateHStats();
+}
+function flipOrientV(){
+  shape.orient=[3,2,1,0][shape.orient||0];
+  updateOrientHint();drawShapeMap();redraw();updateHStats();
+}
+function smMove(e){
+  if(!shapeDrag)return;e.preventDefault();
+  const{mx,my}=smEvtXY(e);
+  const rX=(mx-shapeDrag.ox)/shapeDrag.sc2;
+  const rY=(my-shapeDrag.oy)/shapeDrag.sc2;
+  const R=v=>Math.round(v*100)/100;  // 0.01m丸め
+  const S=shape;
+  if(shapeDrag.name==="tr"){
+    S.w=Math.max(S.nx+0.5,R(rX));
+  } else if(shapeDrag.name==="r_ny"){
+    S.w=Math.max(S.nx+0.5,R(rX));
+    S.ny=Math.max(0.5,Math.min(S.h-0.5,R(rY)));
+  } else if(shapeDrag.name==="nx_ny"){
+    S.nx=Math.max(0.5,Math.min(S.w-0.5,R(rX)));
+    S.ny=Math.max(0.5,Math.min(S.h-0.5,R(rY)));
+  } else if(shapeDrag.name==="nx_h"){
+    S.nx=Math.max(0.5,Math.min(S.w-0.5,R(rX)));
+    S.h=Math.max(S.ny+0.5,R(rY));
+  } else if(shapeDrag.name==="bl"){
+    S.h=Math.max(S.ny+0.5,R(rY));
+  }
+  drawShapeMap();redraw();updateHStats();
+}
+function smUp(){shapeDrag=null;}
+const sc=document.getElementById("shapeMap");
+sc.addEventListener("mousedown",smDown);sc.addEventListener("mousemove",smMove);sc.addEventListener("mouseup",smUp);
+sc.addEventListener("touchstart",smDown,{passive:false});sc.addEventListener("touchmove",smMove,{passive:false});sc.addEventListener("touchend",smUp);
+
+// ===== Main canvas =====
+let CW=700,CH=460;
+const PAD=42;
+
+function resizeCanvas(){
+  const mC=document.getElementById('main');
+  CW=Math.max(280,mC.clientWidth||700);
+  CH=Math.max(200,mC.clientHeight||460);
+  mC.width=CW;
+  mC.height=CH;
+  redraw();
+  if(btmOpen)drawShapeMap();
+}
+function getMS(){
+  const b=sb();
+  const dw=CW-PAD*2,dh=CH-PAD*2;
+  const scale=Math.min(dw/b.totalW,dh/b.totalH);
+  const ox=PAD+(dw-b.totalW*scale)/2-b.minX*scale;
+  const oy=PAD+(dh-b.totalH*scale)/2-b.minY*scale;
+  return{scale,ox,oy,b};
+}
+function toC(rx,ry){const{scale,ox,oy}=getMS();return{cx:ox+rx*scale,cy:oy+ry*scale};}
+function toR(cx,cy){const{scale,ox,oy}=getMS();return{rx:(cx-ox)/scale,ry:(cy-oy)/scale};}
+
+function hexToRgba(hex,a){
+  const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+  return`rgba(${r},${g},${b},${a})`;
+}
+
+function luxColor(lux){
+  if(lux<=0) return"rgb(0,0,0)";
+  const n=Math.min(1,lux/heatConfig.maxLux); // 0..1 正規化
+
+  if(heatConfig.mode==='false'){
+    // 偽色: 黒→紫→青→シアン→緑→黄→赤
+    if(n<0.001) return"rgb(0,0,20)";
+    if(n<0.15){const t=n/0.15;      return`rgb(${Math.round(t*100)},0,${Math.round(t*220)})`;}
+    if(n<0.35){const t=(n-0.15)/0.2;return`rgb(${Math.round(100-t*100)},${Math.round(t*200)},${Math.round(220+t*35)})`;}
+    if(n<0.55){const t=(n-0.35)/0.2;return`rgb(0,${Math.round(200+t*55)},${Math.round(255-t*255)})`;}
+    if(n<0.75){const t=(n-0.55)/0.2;return`rgb(${Math.round(t*255)},255,0)`;}
+    const t=(n-0.75)/0.25;          return`rgb(255,${Math.round(255-t*200)},0)`;
+  }
+
+  // warm mode: 黒→暗い電球色→明るい電球色→白熱
+  if(n<0.008) return"rgb(1,1,2)";
+  if(n<0.08){const t=n/0.08;        return`rgb(${Math.round(t*29)},${Math.round(t*15)},${Math.round(t*9)})`;}
+  if(n<0.2) {const t=(n-0.08)/0.12; return`rgb(${Math.round(29+t*75)},${Math.round(15+t*40)},${Math.round(9+t*12)})`;}
+  if(n<0.5) {const t=(n-0.2)/0.3;   return`rgb(${Math.round(104+t*110)},${Math.round(55+t*100)},${Math.round(21+t*48)})`;}
+  if(n<0.9) {const t=(n-0.5)/0.4;   return`rgb(${Math.round(214+t*36)},${Math.round(155+t*80)},${Math.round(69+t*81)})`;}
+  return"rgb(250,235,150)";
+}
+
+// Draw furniture shape
+function drawFurniture(ctx,f,scale,selected){
+  const fd=FURNITURE_DEFS.find(d=>d.id===f.defId);if(!fd)return;
+  const{cx,cy}=toC(f.x,f.y);
+  const dk=isDark();
+  const fillC="rgba(70,80,125,0.14)";
+  const strokeC=selected?"rgba(80,170,255,0.9)":"rgba(140,155,215,0.38)";
+  const textC="rgba(160,175,225,0.6)";
+
+  const rot=(f.rot||0)*Math.PI/180;
+  const sw=f.scaleW||1.0,sd=f.scaleD||1.0;
+  const w=fd.w*scale*sw,d2=fd.d*scale*sd;
+  ctx.save();ctx.translate(cx,cy);ctx.rotate(rot);
+
+  // Outer rect
+  ctx.fillStyle=fillC;ctx.strokeStyle=strokeC;ctx.lineWidth=selected?1.5:0.8;
+  ctx.setLineDash(selected?[]:[4,3]);
+  ctx.beginPath();ctx.rect(-w/2,-d2/2,w,d2);ctx.fill();ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Interior detail by type
+  ctx.strokeStyle=dk?"rgba(180,190,220,0.18)":"rgba(60,70,110,0.14)";ctx.lineWidth=0.6;
+  if(fd.id==="tv"){
+    // Screen
+    ctx.fillStyle=dk?"rgba(30,40,80,0.3)":"rgba(20,30,70,0.08)";
+    ctx.fillRect(-w/2+3,-d2/2+2,w-6,d2-4);
+    // Stand
+    ctx.beginPath();ctx.moveTo(-4,d2/2);ctx.lineTo(4,d2/2);ctx.stroke();
+  } else if(fd.id==="sofa_l"){
+    const thick=d2*0.52;
+    ctx.fillStyle=fillC;ctx.strokeStyle=strokeC;ctx.lineWidth=selected?1.3:0.7;
+    ctx.beginPath();ctx.rect(-w/2,-d2/2,w,thick);ctx.fill();ctx.stroke();
+    ctx.beginPath();ctx.rect(w/2-thick,-d2/2,thick,d2);ctx.fill();ctx.stroke();
+    for(let i=1;i<3;i++){ctx.beginPath();ctx.moveTo(-w/2+w/3*i,-d2/2+2);ctx.lineTo(-w/2+w/3*i,thick-2);ctx.strokeStyle="rgba(160,170,210,0.15)";ctx.lineWidth=0.5;ctx.stroke();}
+    ctx.strokeStyle=strokeC;ctx.lineWidth=selected?1.3:0.7;
+    ctx.beginPath();ctx.moveTo(w/2-thick+2,-d2/2+d2*0.5);ctx.lineTo(w/2-2,-d2/2+d2*0.5);ctx.stroke();
+  } else if(fd.id==="sofa"){
+    // Seat sections
+    const seats=3,sw=w/seats;
+    for(let i=0;i<seats;i++){ctx.beginPath();ctx.rect(-w/2+i*sw+2,-d2/2+2,sw-4,d2*.6-2);ctx.fillStyle=dk?"rgba(180,190,220,0.06)":"rgba(60,70,110,0.05)";ctx.fill();ctx.stroke();}
+    // Back
+    ctx.beginPath();ctx.rect(-w/2+1,d2*.6/2-d2*.4,w-2,d2*.4);ctx.fillStyle=dk?"rgba(180,190,220,0.1)":"rgba(60,70,110,0.08)";ctx.fill();ctx.stroke();
+  } else if(fd.id==="kitchen"){
+    // Sink
+    ctx.beginPath();ctx.rect(-w/2+4,-d2/2+4,w*.35-4,d2-8);ctx.stroke();
+    ctx.beginPath();ctx.arc(-w/2+4+w*.175/2,-0,4,0,Math.PI*2);ctx.stroke();
+    // Hob circles
+    const hobX=w*.1;const hobCenters=[[-w/2+w*.55,-d2*.2],[-w/2+w*.78,-d2*.2],[-w/2+w*.55,d2*.2],[-w/2+w*.78,d2*.2]];
+    hobCenters.forEach(([hx,hy])=>{ctx.beginPath();ctx.arc(hx,hy,d2*.2,0,Math.PI*2);ctx.stroke();});
+  } else if(fd.id==="cupboard"){
+    // Handles and doors
+    const mid=0;
+    ctx.beginPath();ctx.moveTo(mid,-d2/2+2);ctx.lineTo(mid,d2/2-2);ctx.stroke();
+    [-w*.2,w*.2].forEach(hx=>{ctx.beginPath();ctx.rect(hx-3,-3,6,6);ctx.stroke();});
+  } else if(fd.id==="table"){
+    // Rounded rect suggestion + chairs
+    ctx.beginPath();ctx.rect(-w/2+4,-d2/2+4,w-8,d2-8);ctx.stroke();
+    // chair marks top/bottom
+    for(let i=-1;i<=1;i+=2){
+      ctx.beginPath();ctx.rect(i*(w*.3)-8,-d2/2-6,16,5);ctx.fillStyle=fillC;ctx.fill();ctx.stroke();
+      ctx.beginPath();ctx.rect(i*(w*.3)-8,d2/2+1,16,5);ctx.fill();ctx.stroke();
+    }
+  } else if(fd.id==="bed"){
+    // Pillow area
+    ctx.beginPath();ctx.rect(-w/2+4,d2/2-d2*.32,w-8,d2*.28);ctx.fillStyle=dk?"rgba(180,190,220,0.1)":"rgba(60,70,110,0.07)";ctx.fill();ctx.stroke();
+    // Two pillows
+    [-w*.22,w*.22].forEach(px=>{ctx.beginPath();ctx.rect(px-w*.15,d2/2-d2*.30,w*.3,d2*.24);ctx.stroke();});
+  }
+
+  // Label
+  ctx.fillStyle=textC;ctx.font=`${selected?11:9}px -apple-system,sans-serif`;
+  ctx.textAlign="center";ctx.textBaseline="middle";
+  ctx.fillText(fd.name,0,0);
+  ctx.restore();
+}
+
+function redraw(){
+  const mC=document.getElementById("main");
+  const ctx=mC.getContext("2d");
+  const dk=isDark();
+  const bg="rgb(0,0,0)";
+  const rf="rgb(2,2,4)";
+  const wallC="rgba(140,165,240,0.7)";
+  const gridC="rgba(255,255,255,0.045)";
+  const textC="rgba(255,255,255,0.82)";
+  const zoneLineC="rgba(255,255,255,0.08)";
+
+  ctx.clearRect(0,0,CW,CH);
+  ctx.fillStyle=bg;ctx.fillRect(0,0,CW,CH);
+
+  const{scale,ox,oy,b}=getMS();
+  const tx=x=>ox+x*scale,ty=y=>oy+y*scale;
+
+  // Room fill
+  ctx.fillStyle=rf;
+  lPath(ctx,tx,ty);ctx.fill();
+
+
+
+  // Heatmap
+  const scene=SCENES.find(s=>s.id===activeScene);
+  const cH=parseFloat(document.getElementById("ceilH").value);
+  const res=22;
+  for(let ix=0;ix<res;ix++){
+    for(let iy=0;iy<res;iy++){
+      const rx=b.minX+(ix+.5)/res*b.totalW,ry=b.minY+(iy+.5)/res*b.totalH;
+      if(!isInside(rx,ry))continue;
+      let lux=0;
+      fixtures.forEach(f=>{
+        const p=getPreset(f.presetId);
+        const z=getZone(f.zone);
+        let m=scene.mult;
+        if(scene.zones&&!scene.zones.includes(z.base))m=0;
+        const dx=rx-f.x,dy=ry-f.y;
+        const fh=(f.height!=null)?f.height:cH; // 器具の床からの高さ
+        const horizDist=Math.sqrt(dx*dx+dy*dy);
+        const dist3d=Math.sqrt(dx*dx+dy*dy+fh*fh);
+        const cosTheta=fh/dist3d;
+        const wb=p.warmBias||1.0;
+        let contrib=0;
+        const bt=p.beamType||"cosine";
+        if(bt==="glare_narrow"){
+          // 30度ビーム: 半角15度相当、急峻なコサイン集光
+          const halfRad=15*Math.PI/180;
+          const sinHalf=Math.sin(halfRad);
+          if(cosTheta>Math.cos(halfRad*1.5)){
+            // Gaussian-like beam distribution
+            const theta=Math.acos(Math.min(1,cosTheta));
+            const beamFactor=Math.exp(-Math.pow(theta/halfRad,2.5)*2.8);
+            contrib=(p.lm*m*beamFactor*cosTheta)/(Math.PI*Math.pow(dist3d,2))*55;
+          }
+        } else if(bt==="glare_wide"){
+          // 50度ビーム: 半角25度
+          const halfRad=25*Math.PI/180;
+          if(cosTheta>Math.cos(halfRad*1.4)){
+            const theta=Math.acos(Math.min(1,cosTheta));
+            const beamFactor=Math.exp(-Math.pow(theta/halfRad,2.2)*2.0);
+            contrib=(p.lm*m*beamFactor*cosTheta)/(Math.PI*Math.pow(dist3d,2))*38;
+          }
+        } else if(bt==="soft_glare"){
+          // ソフトグレアレス30度: やや滑らかな分布
+          const halfRad=16*Math.PI/180;
+          const theta=Math.acos(Math.min(1,cosTheta));
+          const beamFactor=Math.pow(Math.max(0,1-theta/(halfRad*1.6)),2.0);
+          contrib=(p.lm*m*beamFactor*cosTheta)/(Math.PI*Math.pow(dist3d,2))*52;
+        } else if(bt==="soft_glare_wide"){
+          // ソフトグレアレス50度
+          const halfRad=26*Math.PI/180;
+          const theta=Math.acos(Math.min(1,cosTheta));
+          const beamFactor=Math.pow(Math.max(0,1-theta/(halfRad*1.5)),1.8);
+          contrib=(p.lm*m*beamFactor*cosTheta)/(Math.PI*Math.pow(dist3d,2))*36;
+        } else {
+          // 通常: Lambert余弦則
+          contrib=p.lm*m*wb*fh/(Math.PI*Math.pow(dist3d,3))*42;
+        }
+        lux+=contrib*wb;
+      });
+      const cw=b.totalW*scale/res+2,ch=b.totalH*scale/res+2;
+      ctx.fillStyle=luxColor(lux);
+      ctx.fillRect(tx(b.minX+ix/res*b.totalW)-1,ty(b.minY+iy/res*b.totalH)-1,cw,ch);
+    }
+  }
+
+  // Grid 910mm ピッチ（単一矩形・原点(0,0)基準）
+  if(showGrid910){
+    const GRID=0.91;
+    ctx.save();
+    // L字クリップ
+    lPath(ctx,tx,ty);ctx.clip();
+    // 全線を太線・不透明度50%で統一
+    ctx.strokeStyle="rgba(255,255,255,0.50)";
+    ctx.lineWidth=1.0;
+    ctx.setLineDash([]);
+    // x方向: 0から shape.w まで 0.91m刻み
+    for(let x=0;x<=shape.w+GRID*0.5;x+=GRID){
+      const xi=Math.round(x*100);
+      // 3640mm(4マス)毎は強調
+      const isBold=(xi%364===0);
+      ctx.strokeStyle=isBold?"rgba(255,255,255,0.70)":"rgba(255,255,255,0.50)";
+      ctx.lineWidth=isBold?1.4:1.0;
+      ctx.beginPath();ctx.moveTo(tx(x),ty(0));ctx.lineTo(tx(x),ty(shape.h));ctx.stroke();
+    }
+    // y方向
+    for(let y=0;y<=shape.h+GRID*0.5;y+=GRID){
+      const yi=Math.round(y*100);
+      const isBold=(yi%364===0);
+      ctx.strokeStyle=isBold?"rgba(255,255,255,0.70)":"rgba(255,255,255,0.50)";
+      ctx.lineWidth=isBold?1.4:1.0;
+      ctx.beginPath();ctx.moveTo(tx(0),ty(y));ctx.lineTo(tx(shape.w),ty(y));ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // Furniture (behind walls)
+  furniture.forEach(f=>{drawFurniture(ctx,f,scale,f.id===selectedFId);});
+
+  // Walls
+  ctx.strokeStyle=wallC;ctx.lineWidth=2;
+  lPath(ctx,tx,ty);ctx.stroke();
+
+  // Dimension lines — L字全辺
+  ctx.save();
+  ctx.font="10px monospace";
+  const DIM_OFF=16;
+  const dm=(x1,y1,x2,y2,label,horiz)=>{
+    ctx.strokeStyle="rgba(255,255,255,0.55)";ctx.lineWidth=0.8;
+    ctx.beginPath();
+    if(horiz){ctx.moveTo(x1,y1-3);ctx.lineTo(x1,y1+3);ctx.moveTo(x2,y2-3);ctx.lineTo(x2,y2+3);}
+    else{ctx.moveTo(x1-3,y1);ctx.lineTo(x1+3,y1);ctx.moveTo(x2-3,y2);ctx.lineTo(x2+3,y2);}
+    ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+    const mx=(x1+x2)/2,my=(y1+y2)/2;
+    const tw=ctx.measureText(label).width;
+    ctx.fillStyle="rgba(255,255,255,0.9)";
+    if(horiz){ctx.fillText(label,mx-tw/2,my-4);}
+    else{ctx.save();ctx.translate(mx,my);ctx.rotate(-Math.PI/2);ctx.fillText(label,-tw/2,-4);ctx.restore();}
+  };
+  const S=shape;
+  // 上辺: (0,0)→(w,0)
+  dm(tx(0),ty(0)-DIM_OFF,tx(S.w),ty(0)-DIM_OFF,S.w.toFixed(2)+"m",true);
+  // 右上辺: (w,0)→(w,ny)
+  dm(tx(S.w)+DIM_OFF,ty(0),tx(S.w)+DIM_OFF,ty(S.ny),S.ny.toFixed(2)+"m",false);
+  // 切り欠き横: (w,ny)→(nx,ny) — 内側なのでテキスト内側へ
+  dm(tx(S.nx),ty(S.ny)+DIM_OFF*0.8,tx(S.w),ty(S.ny)+DIM_OFF*0.8,(S.w-S.nx).toFixed(2)+"m",true);
+  // 切り欠き縦: (nx,ny)→(nx,h)
+  dm(tx(S.nx)+DIM_OFF,ty(S.ny),tx(S.nx)+DIM_OFF,ty(S.h),(S.h-S.ny).toFixed(2)+"m",false);
+  // 下辺: (nx,h)→(0,h)
+  dm(tx(0),ty(S.h)+DIM_OFF,tx(S.nx),ty(S.h)+DIM_OFF,S.nx.toFixed(2)+"m",true);
+  // 左辺: (0,h)→(0,0)
+  dm(tx(0)-DIM_OFF,ty(0),tx(0)-DIM_OFF,ty(S.h),S.h.toFixed(2)+"m",false);
+  ctx.restore();
+
+  // Zone dividers
+  const or=shape.orient||0;
+  const kx=shape.w*0.22,dxEnd=shape.w*0.52;
+  // ゾーン境界線
+  ctx.setLineDash([5,4]);ctx.strokeStyle=zoneLineC;ctx.lineWidth=1;
+  if(or===0||or===3){
+    const yLim=or===0?Math.min(shape.ny,shape.h):shape.h;
+    ctx.beginPath();ctx.moveTo(tx(kx),ty(0));ctx.lineTo(tx(kx),ty(yLim));ctx.stroke();
+    ctx.beginPath();ctx.moveTo(tx(dxEnd),ty(0));ctx.lineTo(tx(dxEnd),ty(yLim));ctx.stroke();
+  } else {
+    const ky=shape.h*0.22,dyEnd=shape.h*0.52;
+    const xLim=or===1?Math.min(shape.nx,shape.w):shape.w;
+    ctx.beginPath();ctx.moveTo(tx(0),ty(ky));ctx.lineTo(tx(xLim),ty(ky));ctx.stroke();
+    ctx.beginPath();ctx.moveTo(tx(0),ty(dyEnd));ctx.lineTo(tx(xLim),ty(dyEnd));ctx.stroke();
+  }
+  ctx.setLineDash([]);
+
+  // Zone labels (from zones array) — orient対応
+  zones.forEach((z,i)=>{
+    let midX,midY;
+    if(or===0||or===3){
+      const kxL=shape.w*0.22,dxL=shape.w*0.52;
+      const baseRangesX={K:[0,kxL],D:[kxL,dxL],L:[dxL,shape.w]};
+      const rx=baseRangesX[z.base];if(!rx)return;
+      midX=(rx[0]+rx[1])/2;midY=shape.h/2;
+    } else {
+      const kyL=shape.h*0.22,dyL=shape.h*0.52;
+      const baseRangesY={K:[0,kyL],D:[kyL,dyL],L:[dyL,shape.h]};
+      const ry=baseRangesY[z.base];if(!ry)return;
+      midX=shape.w/2;midY=(ry[0]+ry[1])/2;
+    }
+    ctx.fillStyle=hexToRgba(z.color,0.7);
+    ctx.font="11px -apple-system,sans-serif";
+    ctx.fillText(z.name,tx(midX)-ctx.measureText(z.name).width/2,ty(midY)+4);
+  });
+
+  scheduleAutoSave();
+
+  // Fixtures
+  fixtures.forEach(f=>{
+    const p=getPreset(f.presetId);
+    const z=getZone(f.zone);
+    const{cx,cy}=toC(f.x,f.y);
+    let on=scene.mult>0;if(scene.zones&&!scene.zones.includes(z.base))on=false;
+    const isSel=f.id===selectedId;
+
+    if(on){
+      const wb=p.warmBias||1.0;
+      const glowA=Math.min(0.40,0.20*wb);
+      const glowR=p.beamType&&p.beamType.includes("narrow")?p.r*scale*.45:p.r*scale*.72;
+      const gr=ctx.createRadialGradient(cx,cy,0,cx,cy,glowR);
+      gr.addColorStop(0,"rgba(255,235,155,"+glowA.toFixed(2)+")");
+      gr.addColorStop(0.45,"rgba(255,200,70,"+(glowA*0.42).toFixed(2)+")");
+      gr.addColorStop(1,"transparent");
+      ctx.fillStyle=gr;ctx.beginPath();ctx.arc(cx,cy,glowR,0,Math.PI*2);ctx.fill();
+    }
+    ctx.beginPath();ctx.arc(cx,cy,8,0,Math.PI*2);
+    ctx.fillStyle=on?(dk?"#ffd878":"#e8a020"):(dk?"#444":"#ccc");ctx.fill();
+    ctx.strokeStyle=isSel?"#2563eb":hexToRgba(z.color,0.6);ctx.lineWidth=isSel?2.5:1.5;ctx.stroke();
+    ctx.fillStyle=dk?"rgba(200,215,245,0.85)":"rgba(40,50,100,0.8)";
+    ctx.font="10px monospace";
+    ctx.fillText(f.label,cx+10,cy-3);
+    if(f.model){ctx.fillStyle=dk?"rgba(120,160,255,0.6)":"rgba(30,60,180,0.55)";ctx.fillText(f.model,cx+10,cy+9);}
+  });
+}
+
+// ===== Canvas events =====
+function mainEvtXY(e){
+  const mC=document.getElementById("main");
+  const r=mC.getBoundingClientRect();
+  const src=e.touches?e.touches[0]:e;
+  return{mx:(src.clientX-r.left)*(CW/r.width),my:(src.clientY-r.top)*(CH/r.height)};
+}
+function mainDown(e){
+  e.preventDefault();
+  const{mx,my}=mainEvtXY(e);
+
+  // Add fixture mode
+  if(addMode){
+    const{rx,ry}=toR(mx,my);
+    if(!isInside(rx,ry))return;
+    const z=getZone(addZoneId);
+    const cnt=fixtures.filter(f=>f.zone===addZoneId).length+1;
+    const pid=document.getElementById("presetSel").value;
+    const pDef=getPreset(pid);
+    const initH=pDef.heightAdjustable?pDef.defaultHeight:null;
+    fixtures.push({id:nextId++,presetId:pid,x:rx,y:ry,zone:addZoneId,label:z.name+"-"+cnt,model:"",height:initH});
+    redraw();updateHStats();return;
+  }
+  // Add furniture mode
+  if(addFurMode){
+    const{rx,ry}=toR(mx,my);
+    if(!isInside(rx,ry))return;
+    furniture.push({id:nextFId++,defId:addFurMode,x:rx,y:ry,rot:0});
+    redraw();return;
+  }
+
+  // Furniture hit
+  for(let i=furniture.length-1;i>=0;i--){
+    const f=furniture[i];
+    const fd=FURNITURE_DEFS.find(d=>d.id===f.defId);if(!fd)continue;
+    const{cx,cy}=toC(f.x,f.y);
+    const{scale}=getMS();
+    const hw=fd.w*scale/2+10,hd=fd.d*scale/2+10;
+    if(Math.abs(mx-cx)<hw&&Math.abs(my-cy)<hd){
+      selectedFId=f.id;selectedId=null;
+      furDragging={id:f.id,ox:mx-cx,oy:my-cy};
+      updateSelPanel();redraw();return;
+    }
+  }
+
+  // Fixture hit
+  for(let i=fixtures.length-1;i>=0;i--){
+    const f=fixtures[i];
+    const{cx,cy}=toC(f.x,f.y);
+    if(Math.hypot(mx-cx,my-cy)<14){
+      selectedId=f.id;selectedFId=null;
+      dragging={id:f.id,ox:mx-cx,oy:my-cy};
+      updateSelPanel();redraw();return;
+    }
+  }
+  selectedId=null;selectedFId=null;updateSelPanel();redraw();
+}
+function mainMove(e){
+  e.preventDefault();
+  const{mx,my}=mainEvtXY(e);
+  if(dragging){
+    const{rx,ry}=toR(mx-dragging.ox+8,my-dragging.oy+8);
+    fixtures=fixtures.map(f=>f.id===dragging.id?{...f,x:rx,y:ry}:f);redraw();
+  }
+  if(furDragging){
+    const{rx,ry}=toR(mx-furDragging.ox,my-furDragging.oy);
+    furniture=furniture.map(f=>f.id===furDragging.id?{...f,x:rx,y:ry}:f);redraw();
+  }
+}
+function mainUp(){dragging=null;furDragging=null;}
+const mC=document.getElementById("main");
+mC.addEventListener("mousedown",mainDown);mC.addEventListener("mousemove",mainMove);mC.addEventListener("mouseup",mainUp);mC.addEventListener("mouseleave",mainUp);
+mC.addEventListener("touchstart",mainDown,{passive:false});mC.addEventListener("touchmove",mainMove,{passive:false});mC.addEventListener("touchend",mainUp);
+
+// ===== Controls =====
+function toggleGrid910(){
+  showGrid910=!showGrid910;
+  const btn=document.getElementById("gridToggleBtn");
+  btn.textContent=showGrid910?"910mm ON":"910mm OFF";
+  btn.classList.toggle("active",showGrid910);
+  redraw();
+}
+function toggleAdd(){
+  addMode=!addMode;addFurMode=null;
+  const btn=document.getElementById("addBtn");
+  btn.textContent=addMode?"📍 タップして配置...":"＋ 配置";
+  btn.classList.toggle("active",addMode);
+  mC.classList.toggle("add-mode",addMode);
+  clearFurBtns();
+}
+function toggleFur(defId){
+  addFurMode=addFurMode===defId?null:defId;
+  addMode=false;
+  document.getElementById("addBtn").textContent="＋ 配置";document.getElementById("addBtn").classList.remove("active");
+  mC.classList.toggle("add-mode",!!addFurMode);
+  document.querySelectorAll(".fur-btn").forEach(b=>b.classList.toggle("active",b.dataset.fur===addFurMode));
+}
+function clearFurBtns(){document.querySelectorAll(".fur-btn").forEach(b=>b.classList.remove("active"));}
+
+function scaleFurW(val){
+  if(!selectedFId)return;
+  furniture=furniture.map(f=>f.id===selectedFId?{...f,scaleW:parseFloat(val)}:f);
+  const el=document.getElementById("swLbl");if(el)el.textContent='幅: '+parseFloat(val).toFixed(2)+'x';
+  redraw();
+}
+function scaleFurD(val){
+  if(!selectedFId)return;
+  furniture=furniture.map(f=>f.id===selectedFId?{...f,scaleD:parseFloat(val)}:f);
+  const el=document.getElementById("sdLbl");if(el)el.textContent='奥行: '+parseFloat(val).toFixed(2)+'x';
+  redraw();
+}
+function resetFurScale(){
+  if(!selectedFId)return;
+  furniture=furniture.map(f=>f.id===selectedFId?{...f,scaleW:1.0,scaleD:1.0}:f);
+  updateSelPanel();redraw();
+}
+function deleteSelected(){
+  if(selectedId){fixtures=fixtures.filter(f=>f.id!==selectedId);selectedId=null;}
+  if(selectedFId){furniture=furniture.filter(f=>f.id!==selectedFId);selectedFId=null;}
+  updateSelPanel();redraw();updateHStats();
+  if(curTab==="list")updateList();if(curTab==="stats")updateStats();
+}
+// Rotate selected furniture
+function rotateFurniture(){
+  if(!selectedFId)return;
+  furniture=furniture.map(f=>f.id===selectedFId?{...f,rot:((f.rot||0)+90)%360}:f);
+  redraw();
+}
+
+function updateSelPanel(){
+  const el=document.getElementById("selPanel");
+  const f=selectedId?fixtures.find(f=>f.id===selectedId):null;
+  const ff=selectedFId?furniture.find(f=>f.id===selectedFId):null;
+  if(!f&&!ff){el.style.display="none";return;}
+  el.style.display="block";
+  if(f){
+    const p=getPreset(f.presetId);const z=getZone(f.zone);
+    let html=`<b>${f.label}</b> — ${p.name}<br>${p.lm}lm / ${p.w}W / エリア: ${z.name}${f.model?"<br>型番: "+f.model:""}`;
+    if(p.heightAdjustable){
+      const fh=f.height!=null?f.height:p.defaultHeight;
+      html+=`<div style="margin-top:7px">`
+        +`<div style="font-size:10px;color:var(--text3);margin-bottom:2px" id="fhLbl">📍 高さ: ${fh.toFixed(2)}m（床から）</div>`
+        +`<input type="range" min="${p.heightMin}" max="${p.heightMax}" step="0.05" value="${fh}" style="width:100%;accent-color:var(--accent)" oninput="setFixtureHeight(this.value)">`
+        +`</div>`;
+    }
+    document.getElementById("selInfo").innerHTML=html;
+  }
+  if(ff){
+    const fd=FURNITURE_DEFS.find(d=>d.id===ff.defId);
+    const sw2=(ff.scaleW||1).toFixed(2),sd2=(ff.scaleD||1).toFixed(2);
+    document.getElementById("selInfo").innerHTML=
+      '<b>'+(fd?fd.name:'家具')+'</b>&nbsp;回転:&nbsp;'+(ff.rot||0)+'deg'+
+      '<div style="margin-top:7px">'+
+        '<div style="font-size:10px;color:var(--text3);margin-bottom:2px" id="swLbl">幅: '+sw2+'x</div>'+
+        '<input type="range" min="0.3" max="3.0" step="0.05" value="'+sw2+'" style="width:100%;accent-color:var(--accent)" oninput="scaleFurW(this.value)">'+
+        '<div style="font-size:10px;color:var(--text3);margin:5px 0 2px" id="sdLbl">奥行: '+sd2+'x</div>'+
+        '<input type="range" min="0.3" max="3.0" step="0.05" value="'+sd2+'" style="width:100%;accent-color:var(--accent)" oninput="scaleFurD(this.value)">'+
+      '</div>'+
+      '<div style="display:flex;gap:5px;margin-top:7px">'+
+        '<button class="btn sm" onclick="rotateFurniture()" style="flex:1">90deg回転</button>'+
+        '<button class="btn sm" onclick="resetFurScale()" style="flex:1">初期化</button>'+
+      '</div>';
+  }
+}
+
+function setHeatMode(mode){
+  heatConfig.mode=mode;
+  document.getElementById("modeWarm").classList.toggle("active",mode==='warm');
+  document.getElementById("modeFalse").classList.toggle("active",mode==='false');
+  redraw();drawLegend();
+}
+function setMaxLux(val){
+  heatConfig.maxLux=parseInt(val);
+  document.getElementById("maxLuxVal").textContent=val;
+  redraw();drawLegend();
+}
+function drawLegend(){
+  const c=document.getElementById("legendCanvas");
+  if(!c)return;
+  const PW=c.parentElement.clientWidth||300;
+  c.width=PW*2;c.style.width=PW+"px";
+  const ctx=c.getContext("2d");
+  const steps=PW*2;
+  for(let i=0;i<steps;i++){
+    ctx.fillStyle=luxColor((i/steps)*heatConfig.maxLux);
+    ctx.fillRect(i,0,2,c.height);
+  }
+  // ラベル目盛り
+  ctx.font="18px monospace";
+  ctx.textBaseline="middle";
+  [0,0.25,0.5,0.75,1].forEach(p=>{
+    const x=p*steps;
+    ctx.strokeStyle="rgba(255,255,255,0.4)";ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,c.height);ctx.stroke();
+  });
+  const el=document.getElementById("legendLabels");
+  if(el){
+    const mx=heatConfig.maxLux;
+    el.innerHTML=[0,0.25,0.5,0.75,1].map(p=>`<span>${Math.round(p*mx)}lx</span>`).join("");
+  }
+}
+
+function setFixtureHeight(val){
+  if(!selectedId)return;
+  fixtures=fixtures.map(f=>f.id===selectedId?{...f,height:parseFloat(val)}:f);
+  const el=document.getElementById("fhLbl");
+  if(el)el.textContent='📍 高さ: '+parseFloat(val).toFixed(2)+'m（床から）';
+  redraw();updateHStats();
+}
+
+function toggleBtm(){
+  btmOpen=!btmOpen;
+  document.getElementById("btmBody").classList.toggle("open",btmOpen);
+  document.getElementById("btmArr").classList.toggle("open",btmOpen);
+  if(btmOpen)initShapeMap();
+}
+function setTab(t,el){
+  curTab=t;
+  document.querySelectorAll(".tab").forEach(b=>b.classList.remove("active"));
+  if(el)el.classList.add("active");
+  document.getElementById("canvasTab").style.display=t==="canvas"?"flex":"none";
+  document.getElementById("listTab").style.display=t==="list"?"block":"none";
+  document.getElementById("statsTab").style.display=t==="stats"?"block":"none";
+  document.getElementById("settingsTab").style.display=t==="settings"?"block":"none";
+  if(t==="list")updateList();if(t==="stats")updateStats();if(t==="settings")drawLegend();
+}
+
+function updateHStats(){
+  const totW=fixtures.reduce((s,f)=>s+getPreset(f.presetId).w,0);
+  const scene=SCENES.find(s=>s.id===activeScene);
+  const area=shape.w*shape.h;
+  let effLm=0;
+  fixtures.forEach(f=>{
+    const p=getPreset(f.presetId);const z=getZone(f.zone);
+    let m=scene.mult;if(scene.zones&&!scene.zones.includes(z.base))m=0;
+    effLm+=p.lm*m;
+  });
+  document.getElementById("hW").textContent=totW+"W";
+  document.getElementById("hLx").textContent=Math.round(effLm/area)+" lx";
+}
+
+// ===== Zone management =====
+function renderZoneBtns(){
+  const wrap=document.getElementById("zoneAreaBtns");
+  const fzSel=document.getElementById("fixZoneSel");
+  wrap.innerHTML="";fzSel.innerHTML="";
+  zones.forEach(z=>{
+    const row=document.createElement("div");
+    row.style.cssText="display:flex;align-items:center;gap:4px;margin-bottom:4px;width:100%";
+    // 選択ボタン
+    const b=document.createElement("button");
+    b.className="btn sm"+(z.id===addZoneId?" active":"");
+    b.style.cssText="border-color:"+z.color+";color:"+(z.id===addZoneId?z.color:"")
+      +";flex:1;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap";
+    b.textContent=z.name;
+    b.onclick=()=>{addZoneId=z.id;renderZoneBtns();};
+    row.appendChild(b);
+    // 面積ラベル
+    const autoArea=getZoneAutoArea(z);
+    const areaVal=(z.area!=null&&z.area>0)?z.area:autoArea;
+    const areaSpan=document.createElement("span");
+    areaSpan.style.cssText="font-size:10px;color:var(--text3);white-space:nowrap;min-width:48px;text-align:right";
+    areaSpan.textContent=(z.area!=null?"★":"auto")+" "+areaVal.toFixed(1)+"m²";
+    row.appendChild(areaSpan);
+    // 削除ボタン (K/D/L基本3つは削除不可)
+    if(!["K","D","L"].includes(z.id)){
+      const del=document.createElement("button");
+      del.className="btn sm";del.textContent="✕";
+      del.style.cssText="color:var(--danger);border-color:var(--danger);padding:4px 7px;flex-shrink:0";
+      del.onclick=()=>deleteZone(z.id);
+      row.appendChild(del);
+    }
+    wrap.appendChild(row);
+    const o=document.createElement("option");o.value=z.id;o.textContent=z.name;fzSel.appendChild(o);
+  });
+  fzSel.value=addZoneId;
+  fzSel.onchange=()=>{addZoneId=fzSel.value;renderZoneBtns();};
+}
+
+function setZoneArea(zoneId,val){
+  const v=parseFloat(val);
+  zones=zones.map(z=>z.id===zoneId?{...z,area:(isNaN(v)||v<=0)?null:v}:z);
+  updateStats();
+}
+function resetZoneArea(zoneId){
+  zones=zones.map(z=>z.id===zoneId?{...z,area:null}:z);
+  updateStats();
+}
+function deleteZone(zoneId){
+  if(["K","D","L"].includes(zoneId)) return; // 基本3ゾーンは削除不可
+  // そのゾーンに属する器具をベースゾーンに移す
+  const z=getZone(zoneId);
+  fixtures=fixtures.map(f=>f.zone===zoneId?{...f,zone:z.base}:f);
+  zones=zones.filter(z=>z.id!==zoneId);
+  if(addZoneId===zoneId) addZoneId="L";
+  renderZoneBtns();redraw();
+  if(curTab==="list")updateList();
+  if(curTab==="stats")updateStats();
+}
+function addZoneArea(){
+  const name=document.getElementById("newZoneName").value.trim();
+  const base=document.getElementById("newZoneBase").value;
+  if(!name||zones.find(z=>z.id===name))return;
+  const baseC=ZONE_BASE_COLORS[base];
+  const colors=[baseC,...ZONE_EXTRA_COLORS];
+  const usedColors=zones.filter(z=>z.base===base).map(z=>z.color);
+  const color=colors.find(c=>!usedColors.includes(c))||ZONE_EXTRA_COLORS[zoneColorIdx++%ZONE_EXTRA_COLORS.length];
+  zones.push({id:name,name,base,color,area:null});
+  document.getElementById("newZoneName").value="";
+  renderZoneBtns();redraw();
+}
+
+// ===== List =====
+function updateList(){
+  const tb=document.getElementById("lbody"),tf=document.getElementById("lfoot");
+  tb.innerHTML="";let tLm=0,tW=0;
+  fixtures.forEach(f=>{
+    const p=getPreset(f.presetId);const z=getZone(f.zone);
+    tLm+=p.lm;tW+=p.w;
+    const tr=document.createElement("tr");
+    tr.className=f.id===selectedId?"sel":"";
+    tr.innerHTML=`<td><span style="color:${z.color};font-weight:500">${f.label}</span></td><td>${p.name}</td><td style="font-family:monospace;font-size:11px;color:var(--text3)">${f.model||"—"}</td><td style="text-align:right">${p.lm}</td><td style="text-align:right">${p.w}</td><td style="text-align:center"><span style="color:${z.color}">${z.name}</span></td>`;
+    tr.onclick=()=>{selectedId=f.id;selectedFId=null;updateSelPanel();redraw();updateList();};
+    tb.appendChild(tr);
+  });
+  tf.innerHTML=`<tr><td colspan="3" style="padding:6px 9px;color:var(--text2)">合計 ${fixtures.length}灯</td><td style="text-align:right;padding:6px 9px;font-weight:600">${tLm.toLocaleString()}</td><td style="text-align:right;padding:6px 9px;font-weight:600">${tW}</td><td></td></tr>`;
+}
+
+// ===== Stats =====
+function getZoneAutoArea(z){
+  // L字全体面積 = w*h - (w-nx)*(h-ny)
+  const totalArea=shape.w*shape.h-(shape.w-shape.nx)*(shape.h-shape.ny);
+  const ratio={K:0.22,D:0.30,L:0.48};
+  return totalArea*(ratio[z.base]||0.33);
+}
+function getZoneLux(zoneId){
+  const scene=SCENES.find(s=>s.id===activeScene);
+  const z=getZone(zoneId);
+  const zfixtures=fixtures.filter(f=>f.zone===zoneId);
+  let effLm=0;
+  zfixtures.forEach(f=>{
+    const p=getPreset(f.presetId);
+    let m=scene.mult;if(scene.zones&&!scene.zones.includes(z.base))m=0;
+    effLm+=p.lm*m;
+  });
+  // area: 手動指定があればそれ、なければ自動
+  const area=(z.area!=null&&z.area>0)?z.area:getZoneAutoArea(z);
+  return{lux:effLm/area,lm:effLm,w:zfixtures.reduce((s,f)=>s+getPreset(f.presetId).w,0),count:zfixtures.length,area,isAutoArea:z.area==null};
+}
+
+function updateStats(){
+  const scene=SCENES.find(s=>s.id===activeScene);
+  const totalArea=shape.w*shape.h-(shape.w-shape.nx)*(shape.h-shape.ny);
+  let effLm=0,totW=0;
+  fixtures.forEach(f=>{
+    const p=getPreset(f.presetId);const z=getZone(f.zone);
+    let m=scene.mult;if(scene.zones&&!scene.zones.includes(z.base))m=0;
+    effLm+=p.lm*m;totW+=p.w;
+  });
+  const avgLux=effLm/totalArea;
+  const wrap=document.getElementById("statsWrap");
+  wrap.innerHTML="";
+
+  // 密度単位トグル
+  const unitRow=document.createElement("div");
+  unitRow.style.cssText="display:flex;align-items:center;gap:6px;margin-bottom:8px";
+  unitRow.innerHTML=`<span style="font-size:10px;color:var(--text3)">密度単位:</span>`
+    +`<button class="btn sm${densityUnit==='m2'?' active':''}" id="densityM2" onclick="densityUnit='m2';scheduleAutoSave();updateStats()">lm/m²</button>`
+    +`<button class="btn sm${densityUnit==='tatami'?' active':''}" id="densityTatami" onclick="densityUnit='tatami';scheduleAutoSave();updateStats()">lm/畳</button>`;
+  wrap.appendChild(unitRow);
+
+  // サマリーカード
+  const isTatami=densityUnit==='tatami';
+  const densityPerArea=effLm/totalArea;
+  const densityDisp=isTatami?(densityPerArea*TATAMI).toFixed(1):densityPerArea.toFixed(1);
+  const densityLbl=isTatami?'光束密度':'光束密度';
+  const densityUnit2=isTatami?'lm/畳':'lm/m²';
+  const densityGuide=isTatami?'推奨 300〜700':'推奨 200〜500';
+  const densityOk=isTatami?(densityPerArea*TATAMI>=300):(densityPerArea>=200);
+
+  const cards=document.createElement("div");
+  cards.className="scards";
+  cards.innerHTML=
+    "<div class='scard'><div class='lbl'>LDK全体・平均照度</div><div class='val'>"+Math.round(avgLux)+" lx</div><div class='sub'>"+(avgLux>=300?"明るい":avgLux>=100?"標準":"暗め")+"</div></div>"
+    +"<div class='scard'><div class='lbl'>"+densityLbl+"</div><div class='val' style='color:"+(densityOk?"var(--success)":"var(--warn)")+"'>"+densityDisp+"</div><div class='sub'>"+densityUnit2+"（"+densityGuide+"）</div></div>"
+    +"<div class='scard'><div class='lbl'>消費電力合計</div><div class='val'>"+totW+"W</div><div class='sub'>"+(totW/totalArea).toFixed(1)+" W/m²</div></div>"
+    +"<div class='scard'><div class='lbl'>床面積（L字）</div><div class='val'>"+totalArea.toFixed(1)+" m²</div><div class='sub'>"+(totalArea/1.65).toFixed(1)+"帖</div></div>";
+  wrap.appendChild(cards);
+
+  // エリア別
+  const zoneTitleEl=document.createElement("div");
+  zoneTitleEl.className="sec-title";zoneTitleEl.textContent="エリア別照度分析";
+  wrap.appendChild(zoneTitleEl);
+
+  zones.forEach(z=>{
+    const d=getZoneLux(z.id);
+    const luxLabel=d.lux>=300?"明るい":d.lux>=150?"標準":d.lux>=75?"やや暗い":"暗め";
+    const bar=Math.min(100,d.lux/5);
+
+    const card=document.createElement("div");
+    card.style.cssText="background:var(--surface2);border-radius:10px;padding:9px 11px;margin-bottom:7px;border-left:3px solid "+z.color;
+
+    // ヘッダ行
+    const hdr=document.createElement("div");
+    hdr.style.cssText="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px";
+    hdr.innerHTML="<span style='font-weight:500;color:"+z.color+"'>"+z.name+"</span>"
+      +"<span style='font-size:12px;font-weight:600'>"+Math.round(d.lux)+" lx</span>";
+    card.appendChild(hdr);
+
+    // バー
+    const barWrap=document.createElement("div");
+    barWrap.style.cssText="height:4px;background:var(--border);border-radius:2px;margin-bottom:6px";
+    barWrap.innerHTML="<div style='height:4px;border-radius:2px;background:"+z.color+";width:"+bar+"%;opacity:0.7'></div>";
+    card.appendChild(barWrap);
+
+    // 統計行
+    const stats=document.createElement("div");
+    stats.style.cssText="font-size:10px;color:var(--text3);display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px";
+    const areaLabel=(d.isAutoArea?"自動 ":"手動 ")+d.area.toFixed(2)+"m²";
+    const zDensity=densityUnit==='tatami'?(d.lm/d.area*TATAMI).toFixed(1)+" lm/畳":(d.lm/d.area).toFixed(1)+" lm/m²";
+    stats.innerHTML="<span>"+d.count+"灯</span><span>"+d.lm.toLocaleString()+" lm</span><span>"+d.w+"W</span><span>"+luxLabel+"</span>"
+      +"<span style='color:var(--text2)'>"+zDensity+"</span>"
+      +"<span style='margin-left:auto'>面積: "+areaLabel+"</span>";card.appendChild(stats);
+
+    // 面積入力行
+    const areaRow=document.createElement("div");
+    areaRow.style.cssText="display:flex;gap:5px;align-items:center";
+    const inp=document.createElement("input");
+    inp.type="number";inp.min="0.1";inp.max="200";inp.step="0.1";
+    inp.placeholder="m\u00b2を直接入力";
+    inp.value=d.isAutoArea?"":d.area.toFixed(2);
+    inp.style.cssText="flex:1;padding:4px 7px;border-radius:8px;border:1px solid var(--border2);background:var(--surface);color:var(--text);font-size:11px;outline:none";
+    inp.oninput=(function(zid){return function(){setZoneArea(zid,this.value);};})(z.id);
+    const rst=document.createElement("button");
+    rst.className="btn sm";rst.textContent="自動に戻す";rst.style.cssText="flex-shrink:0;font-size:10px";
+    rst.onclick=(function(zid){return function(){resetZoneArea(zid);};})(z.id);
+    areaRow.appendChild(inp);areaRow.appendChild(rst);
+    card.appendChild(areaRow);
+    wrap.appendChild(card);
+  });
+
+  // JIS
+  const jisTitle=document.createElement("div");
+  jisTitle.className="sec-title";jisTitle.textContent="JIS照度推奨値";
+  wrap.appendChild(jisTitle);
+  [["キッチン作業面",200,500],["ダイニングテーブル",150,300],["リビング全般",75,150],["くつろぎ",30,75]].forEach(([l,mn,mx])=>{
+    const row=document.createElement("div");row.className="stbl-row";
+    const ok=avgLux>=mn;
+    row.innerHTML="<span class='name'>"+l+"</span><span class='range'>"+mn+"\u301c"+mx+" lx</span><span class='status "+(ok?"ok":"bad")+"'>"+(ok?"\u2713":"\u25b3")+"</span>";
+    wrap.appendChild(row);
+  });
+  const note=document.createElement("div");
+  note.style.cssText="font-size:10px;color:var(--text3);margin-top:8px;padding-bottom:16px";
+  note.textContent="\u203b \u5e73\u5747\u7167\u5ea6\u3067\u306e\u7c21\u6613\u5224\u5b9a\u3002\u5c40\u6240\u7167\u5ea6\u30fb\u5668\u5177\u914d\u5149\u7279\u6027\u306b\u3088\u308a\u5b9f\u969b\u306f\u7570\u306a\u308a\u307e\u3059\u3002";
+  wrap.appendChild(note);
+}
+
+
+const DAIKO_DB=[
+  {model:"DDL-5121",name:"グレアレスDL φ75 30° 電球色",lm:485,w:6.1,presetId:"gl_30"},
+  {model:"DDL-5122",name:"グレアレスDL φ75 50° 電球色",lm:510,w:6.3,presetId:"gl_50"},
+  {model:"DDL-5123",name:"グレアレスDL φ75 30° 昼白色",lm:500,w:6.1,presetId:"gl_30"},
+  {model:"DDL-5127",name:"グレアレスDL φ75 電球色2700K",lm:430,w:5.5,presetId:"gl_30"},
+  {model:"DDL-5500",name:"ユニバーサルDL φ100 電球色",lm:850,w:9.5,presetId:"dl_m"},
+  {model:"DDL-5501",name:"ユニバーサルDL φ100 高演色Ra90",lm:800,w:9.5,presetId:"dl_m"},
+  {model:"DDL-5600",name:"ダウンライト φ150 電球色",lm:1520,w:15.3,presetId:"dl_l"},
+  {model:"DDL-5601",name:"ダウンライト φ150 昼白色",lm:1600,w:15.5,presetId:"dl_l"},
+  {model:"DDL-5700",name:"グレアレスDL φ100 30° 電球色",lm:800,w:9.0,presetId:"gl_30"},
+  {model:"DDL-5701",name:"グレアレスDL φ100 50° 電球色",lm:800,w:9.0,presetId:"gl_50"},
+  {model:"DDL-5810",name:"ソフトグレアレスDL φ100 30°",lm:750,w:8.5,presetId:"sgl_30"},
+  {model:"DDL-5811",name:"ソフトグレアレスDL φ100 50°",lm:750,w:8.5,presetId:"sgl_50"},
+  {model:"DDL-5900",name:"ダウンライト φ75 電球色2700K",lm:400,w:5.0,presetId:"dl_s"},
+  {model:"DDL-5901",name:"ダウンライト φ75 昼白色5000K",lm:420,w:5.0,presetId:"dl_s"},
+  {model:"DDL-5910",name:"ダウンライト φ100 電球色2700K",lm:750,w:8.0,presetId:"dl_m"},
+  {model:"DDL-5911",name:"ダウンライト φ100 昼白色5000K",lm:780,w:8.0,presetId:"dl_m"},
+  {model:"DDL-6000",name:"ダウンライト φ150 電球色",lm:1600,w:16,presetId:"dl_l"},
+  {model:"DDL-6001",name:"ダウンライト φ150 昼白色",lm:1650,w:16,presetId:"dl_l"},
+  {model:"DDL-6100",name:"グレアレスDL φ75 電球色2700K 30°",lm:450,w:5.5,presetId:"gl_30"},
+  {model:"DDL-6101",name:"グレアレスDL φ75 電球色2700K 50°",lm:480,w:5.8,presetId:"gl_50"},
+  {model:"DDL-6200",name:"ソフトグレアレスDL φ75 30°",lm:420,w:5.2,presetId:"sgl_30"},
+  {model:"DDL-6201",name:"ソフトグレアレスDL φ75 50°",lm:440,w:5.4,presetId:"sgl_50"},
+  {model:"DSY-4655",name:"スポットライト 30° 電球色",lm:620,w:8.5,presetId:"spot"},
+  {model:"DSY-4656",name:"スポットライト 50° 電球色",lm:650,w:8.8,presetId:"spot"},
+  {model:"DPN-38427",name:"ペンダント 電球色",lm:1150,w:12.0,presetId:"pendant"},
+  {model:"DPN-38428",name:"ペンダント 昼白色",lm:1200,w:12.0,presetId:"pendant"},
+  {model:"DCL-38487",name:"シーリングライト 〜12畳",lm:4000,w:42,presetId:"ceiling"},
+  {model:"DCL-38488",name:"シーリングライト 〜14畳 高演色",lm:5000,w:52,presetId:"ceiling"},
+];
+
+function searchDaiko(){
+  const raw=document.getElementById("daikoIn").value.trim();
+  const el=document.getElementById("daikoRes");
+  if(!raw){el.textContent="型番を入力してください";return;}
+  const q=raw.toUpperCase().replace(/[-\s]/g,"");
+  const norm=s=>s.toUpperCase().replace(/[-\s]/g,"");
+  const hits=DAIKO_DB.filter(d=>norm(d.model).includes(q)||q.startsWith(norm(d.model).slice(0,4)));
+  if(hits.length===0){
+    el.innerHTML=`<span style="color:var(--danger)">「${raw}」は見つかりません</span><br>`
+      +`<span style="font-size:10px;color:var(--text3)">例: DDL-5121, DDL-5700, DSY-4655, DPN-38427</span>`;
+    return;
+  }
+  if(hits.length===1){
+    const d=hits[0];
+    window._daikoLast={name:d.name,lm:d.lm,w:d.w,model:d.model};
+    el.innerHTML=`<b>${d.model}</b> — ${d.name}<br><span style="color:var(--text2)">${d.lm}lm / ${d.w}W</span>`
+      +`<br><button class="btn sm" style="margin-top:5px" onclick="applyDaikoLast()">✓ 選択中の器具に反映</button>`;
+  } else {
+    el.innerHTML=hits.map((d,i)=>
+      `<div style="padding:4px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="window._daikoLast={name:'${d.name.replace(/'/g,"\\'")}',lm:${d.lm},w:${d.w},model:'${d.model}'};applyDaikoLast();document.getElementById('daikoRes').querySelector('div:nth-child(${i+1})').style.background='var(--accent-bg)'">`
+      +`<b>${d.model}</b> <span style="color:var(--text3);font-size:11px">${d.name}</span><br>`
+      +`<span style="font-size:10px;color:var(--text3)">${d.lm}lm / ${d.w}W → タップで反映</span></div>`
+    ).join("");
+  }
+}
+
+function applyDaikoLast(){
+  if(!window._daikoLast)return;
+  applyDaiko(window._daikoLast,window._daikoLast.model);
+}
+function applyDaiko(info,model){
+  if(!selectedId){alert("平面図で器具を選択してから反映してください");return;}
+  const newId="dk_"+model.replace(/[^a-zA-Z0-9]/g,"_");
+  if(!PRESETS.find(p=>p.id===newId))PRESETS.push({id:newId,name:info.name,lm:info.lm,w:info.w,r:1.2});
+  fixtures=fixtures.map(f=>f.id!==selectedId?f:{...f,presetId:newId,model});
+  redraw();updateSelPanel();updateHStats();
+  document.getElementById("daikoRes").innerHTML+="<br><span style='color:var(--success)'>✓ 反映済み</span>";
+}
+document.getElementById("daikoIn").addEventListener("keydown",e=>{if(e.key==="Enter")searchDaiko();});
+
+// ===== State persistence =====
+function getAppState(){
+  return{
+    v:2,
+    shape:{...shape},
+    fixtures:fixtures.map(f=>({...f})),
+    furniture:furniture.map(f=>({...f})),
+    zones:zones.map(z=>({...z})),
+    heatConfig:{...heatConfig},
+    activeScene,showGrid910,densityUnit,
+    ceilH:parseFloat(document.getElementById('ceilH').value),
+    nextId,nextFId,
+  };
+}
+function applyAppState(s){
+  if(!s||s.v!==2)return false;
+  shape={...s.shape};
+  fixtures=s.fixtures||[];
+  furniture=s.furniture||[];
+  if(s.zones&&s.zones.length)zones=s.zones;
+  heatConfig={...heatConfig,...s.heatConfig};
+  activeScene=s.activeScene||'all';
+  showGrid910=s.showGrid910!==undefined?s.showGrid910:true;
+  densityUnit=s.densityUnit||'m2';
+  nextId=s.nextId||Math.max(20,...fixtures.map(f=>f.id))+1;
+  nextFId=s.nextFId||Math.max(10,...furniture.map(f=>f.id))+1;
+  if(s.ceilH!=null){
+    document.getElementById('ceilH').value=s.ceilH;
+    document.getElementById('ceilHVal').textContent=s.ceilH.toFixed(2)+'m';
+  }
+  syncUI();
+  return true;
+}
+function syncUI(){
+  document.getElementById('roomW').value=shape.w;document.getElementById('roomWVal').textContent=shape.w.toFixed(2)+'m';
+  document.getElementById('roomH').value=shape.h;document.getElementById('roomHVal').textContent=shape.h.toFixed(2)+'m';
+  document.getElementById('roomNX').value=shape.nx;document.getElementById('roomNXVal').textContent=shape.nx.toFixed(2)+'m';
+  document.getElementById('roomNY').value=shape.ny;document.getElementById('roomNYVal').textContent=shape.ny.toFixed(2)+'m';
+  const gb=document.getElementById('gridToggleBtn');
+  gb.textContent=showGrid910?'910mm ON':'910mm OFF';gb.classList.toggle('active',showGrid910);
+  document.querySelectorAll('#sceneBtns .btn').forEach((b,i)=>{b.classList.toggle('active',SCENES[i]&&SCENES[i].id===activeScene);});
+  const mls=document.getElementById('maxLuxSlider');
+  if(mls){mls.value=heatConfig.maxLux;document.getElementById('maxLuxVal').textContent=heatConfig.maxLux;}
+  document.getElementById('modeWarm')?.classList.toggle('active',heatConfig.mode==='warm');
+  document.getElementById('modeFalse')?.classList.toggle('active',heatConfig.mode==='false');
+  renderZoneBtns();updateOrientHint();
+}
+let _saveTimer=null;
+function scheduleAutoSave(){
+  clearTimeout(_saveTimer);
+  _saveTimer=setTimeout(()=>{
+    try{localStorage.setItem('ldkSim_v2',JSON.stringify(getAppState()));}catch(e){}
+  },800);
+}
+function exportState(){
+  const json=JSON.stringify(getAppState(),null,2);
+  const a=document.createElement('a');
+  const date=new Date().toISOString().slice(0,10);
+  a.href='data:application/json;charset=utf-8,'+encodeURIComponent(json);
+  a.download='ldk-lighting-'+date+'.json';a.click();
+}
+function importState(){
+  const input=document.createElement('input');
+  input.type='file';input.accept='.json,application/json';
+  input.onchange=e=>{
+    const file=e.target.files[0];if(!file)return;
+    const reader=new FileReader();
+    reader.onload=ev=>{
+      try{
+        const s=JSON.parse(ev.target.result);
+        if(applyAppState(s)){
+          redraw();updateHStats();
+          if(curTab==='list')updateList();
+          if(curTab==='stats')updateStats();
+          if(curTab==='settings')drawLegend();
+        }else{alert('非対応のファイル形式です（v2形式が必要）');}
+      }catch(err){alert('読み込みエラー: '+err.message);}
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+
+// ===== Init =====
+// Scene buttons
+const sb2=document.getElementById("sceneBtns");
+SCENES.forEach(s=>{
+  const b=document.createElement("button");b.className="btn sm"+(s.id==="all"?" active":"");b.textContent=s.name;
+  b.onclick=()=>{activeScene=s.id;document.querySelectorAll("#sceneBtns .btn").forEach(bb=>bb.classList.remove("active"));b.classList.add("active");redraw();updateHStats();if(curTab==="stats")updateStats();};
+  sb2.appendChild(b);
+});
+
+// Preset select
+const ps=document.getElementById("presetSel");
+PRESETS.forEach(p=>{const o=document.createElement("option");o.value=p.id;o.textContent=p.name+" ("+p.lm+"lm/"+p.w+"W)";ps.appendChild(o);});
+
+// Furniture buttons
+const fb=document.getElementById("furnitureBtns");
+FURNITURE_DEFS.forEach(fd=>{
+  const b=document.createElement("button");
+  b.className="btn sm fur-btn";b.dataset.fur=fd.id;
+  b.textContent=fd.name;
+  b.onclick=()=>toggleFur(fd.id);
+  fb.appendChild(b);
+});
+
+// Render zone buttons
+renderZoneBtns();
+
+// Dark mode listener
+window.matchMedia("(prefers-color-scheme:dark)").addEventListener("change",()=>{redraw();if(btmOpen)drawShapeMap();});
+window.addEventListener("resize",()=>{resizeCanvas();if(btmOpen)initShapeMap();});
+
+// 保存済み設定をロード
+try{
+  const saved=localStorage.getItem('ldkSim_v2');
+  if(saved){applyAppState(JSON.parse(saved));}
+}catch(e){}
+
+resizeCanvas();
+initShapeMap();
+updateHStats();
+</script>
+</body>
+</html>
