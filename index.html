@@ -260,6 +260,9 @@ canvas#shapeMap{border-radius:6px;border:1px solid var(--border);display:block;w
           <button class="btn sm active" onclick="exportState()" style="flex:1">⬇ JSONで書き出し</button>
           <button class="btn sm" onclick="importState()" style="flex:1">⬆ JSONを読み込み</button>
         </div>
+        <div style="margin-top:6px">
+          <button class="btn sm" onclick="exportDXF()" style="width:100%">⬇ DXFで書き出し（DIALux用）</button>
+        </div>
         <div style="font-size:10px;color:var(--text3);margin-top:6px">書き出したJSONファイルを別のブラウザ・PCで読み込むことができます。</div>
       </div>
     </div>
@@ -1650,6 +1653,80 @@ function exportState(){
   const date=new Date().toISOString().slice(0,10);
   a.href='data:application/json;charset=utf-8,'+encodeURIComponent(json);
   a.download='ldk-lighting-'+date+'.json';a.click();
+}
+
+function exportDXF(){
+  const S=shape;
+  const or=S.orient||0;
+  // L字頂点を orient 別に生成（単位: mm）
+  const mm=v=>Math.round(v*1000);
+  let pts=[];
+  if(or===0){
+    pts=[[0,0],[S.w,0],[S.w,S.ny],[S.nx,S.ny],[S.nx,S.h],[0,S.h]];
+  }else if(or===1){
+    pts=[[0,S.ny],[S.w-S.nx,S.ny],[S.w-S.nx,0],[S.w,0],[S.w,S.h],[0,S.h]];
+  }else if(or===2){
+    pts=[[S.w-S.nx,0],[S.w,0],[S.w,S.h],[0,S.h],[0,S.h-S.ny],[S.w-S.nx,S.h-S.ny]];
+  }else{
+    pts=[[0,0],[S.nx,0],[S.nx,S.h-S.ny],[S.w,S.h-S.ny],[S.w,S.h],[0,S.h]];
+  }
+
+  const lines=[];
+  const h=(code,val)=>lines.push(String(code),String(val));
+
+  // DXF header
+  h(0,'SECTION');h(2,'HEADER');
+  h(9,'$INSUNITS');h(70,4); // 4=mm
+  h(0,'ENDSEC');
+
+  // ENTITIES
+  h(0,'SECTION');h(2,'ENTITIES');
+
+  // 部屋輪郭: LWPOLYLINE
+  h(0,'LWPOLYLINE');
+  h(8,'Room');       // レイヤー名
+  h(70,1);           // closed
+  h(90,pts.length);
+  pts.forEach(([x,y])=>{h(10,mm(x));h(20,mm(y));});
+
+  // 照明: INSERT相当をCIRCLE+TEXT で表現
+  fixtures.forEach(f=>{
+    const p=getPreset(f.presetId);
+    const x=mm(f.x),y=mm(f.y);
+    const r=Math.round(p.r*1000*0.15); // 表示半径
+    // CIRCLE
+    h(0,'CIRCLE');h(8,'Fixtures');
+    h(10,x);h(20,y);h(40,r);
+    // TEXT ラベル
+    h(0,'TEXT');h(8,'Fixtures');
+    h(10,x+r+20);h(20,y);h(40,80);
+    h(1,f.label+(f.model?' '+f.model:'')+' ('+p.lm+'lm)');
+  });
+
+  // 家具: RECTANGLE (4頂点LWPOLYLINE)
+  furniture.forEach(f=>{
+    const fd=FURNITURE_DEFS.find(d=>d.id===f.defId);if(!fd)return;
+    const sw=fd.w*(f.scaleW||1),sd=fd.d*(f.scaleD||1);
+    const rot=(f.rot||0)*Math.PI/180;
+    const cos=Math.cos(rot),sin=Math.sin(rot);
+    const corners=[[-sw/2,-sd/2],[sw/2,-sd/2],[sw/2,sd/2],[-sw/2,sd/2]];
+    const rotated=corners.map(([cx,cy])=>[
+      f.x+cx*cos-cy*sin,
+      f.y+cx*sin+cy*cos
+    ]);
+    h(0,'LWPOLYLINE');h(8,'Furniture');h(70,1);h(90,4);
+    rotated.forEach(([rx,ry])=>{h(10,mm(rx));h(20,mm(ry));});
+  });
+
+  h(0,'ENDSEC');
+  h(0,'EOF');
+
+  const dxf=lines.join('\n');
+  const a=document.createElement('a');
+  const date=new Date().toISOString().slice(0,10);
+  a.href='data:application/dxf;charset=utf-8,'+encodeURIComponent(dxf);
+  a.download='ldk-lighting-'+date+'.dxf';
+  a.click();
 }
 function importState(){
   const input=document.createElement('input');
