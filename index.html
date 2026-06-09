@@ -428,7 +428,20 @@ function parseIES(text){
     ti+=numV;
   }
   if(candela.length===0)throw new Error('配光データがありません');
-  return{lumens:numLamps*lumensPerLamp,watts,vAngles,hAngles,candela};
+  // 上向き光束の割合を算出（天井反射計算用）
+  let totalFlux=0,upwardFlux=0;
+  for(let vi=0;vi<vAngles.length-1;vi++){
+    const t1=vAngles[vi]*Math.PI/180,t2=vAngles[vi+1]*Math.PI/180;
+    const solidAngle=2*Math.PI*Math.abs(Math.cos(t1)-Math.cos(t2));
+    let cd=0;
+    for(let hi=0;hi<hAngles.length;hi++) cd+=(candela[hi][vi]+candela[hi][vi+1])/2;
+    cd/=hAngles.length;
+    const flux=cd*solidAngle;
+    totalFlux+=flux;
+    if(vAngles[vi]>=90) upwardFlux+=flux;
+  }
+  const upwardFraction=totalFlux>0?upwardFlux/totalFlux:0;
+  return{lumens:numLamps*lumensPerLamp,watts,vAngles,hAngles,candela,upwardFraction};
 }
 
 function interpolateIES(ies,thetaDeg,phiDeg){
@@ -783,11 +796,24 @@ function redraw(){
   const scene=SCENES.find(s=>s.id===activeScene);
   const cH=parseFloat(document.getElementById("ceilH").value);
   const res=44;
+  // IES器具の天井反射による均一環境光を事前計算
+  const REFLECT=0.45; // 部屋平均反射率（天井0.7・壁0.5・床0.3の組み合わせ）
+  const floorArea=shape.w*shape.h-(shape.w-shape.nx)*(shape.h-shape.ny);
+  let ambientLux=0;
+  fixtures.forEach(f=>{
+    if(!f.iesData||f.enabled===false)return;
+    const dimLv=f.dimLevel!=null?f.dimLevel:1.0;
+    if(dimLv<=0)return;
+    const z=getZone(f.zone);
+    let m=scene.mult;if(scene.zones&&!scene.zones.includes(z.base))m=0;
+    const upLm=f.iesData.lumens*(f.iesData.upwardFraction||0)*m*dimLv;
+    ambientLux+=upLm*REFLECT/floorArea;
+  });
   for(let ix=0;ix<res;ix++){
     for(let iy=0;iy<res;iy++){
       const rx=b.minX+(ix+.5)/res*b.totalW,ry=b.minY+(iy+.5)/res*b.totalH;
       if(!isInside(rx,ry))continue;
-      let lux=0;
+      let lux=ambientLux;
       fixtures.forEach(f=>{
         const p=getPreset(f.presetId);
         const z=getZone(f.zone);
