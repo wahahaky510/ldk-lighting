@@ -302,36 +302,48 @@ const FURNITURE_DEFS=[
 ];
 
 // Shape: 2 rects forming L
-let shape={w:9.5,h:5.5,nx:5.5,ny:3.5,orient:0,zoneDiv1:0.22,zoneDiv2:0.52};
+let shape={w:6.37,h:9.1,nx:4.78,ny:5.46,orient:2,zoneDiv1:0.22,zoneDiv2:0.52};
 
 // Zones: {id, name, base (K/D/L), color}
 let zones=[
-  {id:"K",name:"K",base:"K",color:"#059669",area:null,rect:{x1:0,y1:0,x2:0.22,y2:1}},
-  {id:"D",name:"D",base:"D",color:"#2563eb",area:null,rect:{x1:0.22,y1:0,x2:0.52,y2:1}},
-  {id:"L",name:"L",base:"L",color:"#9333ea",area:null,rect:{x1:0.52,y1:0,x2:1,y2:1}},
+  {id:"K",name:"K",base:"K",color:"#059669",area:null,rect:{x1:0,y1:0.677,x2:0.499,y2:0.999}},
+  {id:"D",name:"D",base:"D",color:"#2563eb",area:null,rect:{x1:0.501,y1:0.672,x2:1,y2:1}},
+  {id:"L",name:"L",base:"L",color:"#9333ea",area:null,rect:{x1:0.215,y1:0,x2:1,y2:0.412}},
+  {id:"L-1",name:"L-1",base:"L",color:"#db2777",area:null,rect:{x1:0,y1:0.408,x2:1,y2:0.672}},
 ];
 
 let fixtures=[
-  {id:1,presetId:"dl_m",x:1.2,y:0.8,zone:"K",label:"K-1",model:""},
-  {id:2,presetId:"dl_m",x:2.8,y:0.8,zone:"K",label:"K-2",model:""},
-  {id:3,presetId:"pendant",x:5.5,y:2.0,zone:"D",label:"D-1",model:""},
-  {id:4,presetId:"dl_l",x:7.5,y:1.0,zone:"L",label:"L-1",model:""},
-  {id:5,presetId:"dl_l",x:8.5,y:3.5,zone:"L",label:"L-2",model:""},
+  {id:30,presetId:"bracket",x:2.912,y:9.069,zone:"K",label:"K-1",model:"",height:null,enabled:true,dimLevel:0.58},
+  {id:31,presetId:"bracket",x:5.166,y:9.090,zone:"K",label:"K-2",model:"",height:null,enabled:true,dimLevel:0.57},
+  {id:32,presetId:"dl_s",x:1.768,y:7.054,zone:"K",label:"K-3",model:"",height:null,enabled:true,dimLevel:1},
+  {id:33,presetId:"ph5",x:4.834,y:7.054,zone:"D",label:"D-1",model:"",height:1.6,enabled:true,dimLevel:0.04},
+  {id:34,presetId:"floor_indirect",x:2.232,y:0.031,zone:"L",label:"L-1",model:"",height:1.4,enabled:true,dimLevel:1},
+  {id:35,presetId:"floor_indirect",x:5.796,y:0.052,zone:"L",label:"L-2",model:"",height:1.4,enabled:true,dimLevel:1},
+  {id:36,presetId:"gl_30",x:2.795,y:2.067,zone:"L",label:"L-3",model:"",height:null,enabled:true,dimLevel:1},
+  {id:37,presetId:"gl_30",x:4.055,y:2.075,zone:"L",label:"L-4",model:"",height:null,enabled:true,dimLevel:1},
+  {id:38,presetId:"gl_30",x:5.050,y:2.067,zone:"L",label:"L-5",model:"",height:null,enabled:true,dimLevel:1},
 ];
 
-let furniture=[]; // {id,defId,x,y,rot:0|90|180|270}
+let furniture=[
+  {id:10,defId:"tv",x:4.005,y:0.176,rot:0},
+  {id:11,defId:"sofa_l",x:3.939,y:2.607,rot:180,scaleD:1.1},
+  {id:12,defId:"kitchen",x:1.934,y:7.033,rot:0,scaleD:1.4},
+  {id:13,defId:"cupboard",x:4.039,y:8.840,rot:0,scaleW:1.55},
+  {id:14,defId:"kitchen",x:1.818,y:8.840,rot:0,scaleW:0.65,scaleD:0.85},
+  {id:16,defId:"table",x:4.751,y:7.054,rot:0,scaleW:1.1},
+];
 
-let heatConfig={maxLux:500,mode:'warm'};
+let heatConfig={maxLux:1000,mode:'warm'};
 let densityUnit='m2'; // 'm2' | 'tatami'
 const TATAMI=1.65;   // 1畳 = 1.65m²
-let nextId=20,nextFId=10;
+let nextId=39,nextFId=17;
 let selectedId=null,selectedFId=null; // fixture or furniture selected
 let addMode=false,addFurMode=null; // addFurMode = defId string
 let addZoneId="L";
 let activeScene="all",curTab="canvas";
 let dragging=null,furDragging=null,shapeDrag=null,zoneDrag=null,btmOpen=false;
 let showGrid910=true;
-let showZone=true;
+let showZone=false;
 let statsZone="ALL";
 
 // ===== Shape helpers =====
