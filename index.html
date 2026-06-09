@@ -36,9 +36,9 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 .tabbar::-webkit-scrollbar{display:none}
 .tab{padding:9px 13px;font-size:12px;color:var(--text3);border:none;background:transparent;border-bottom:2px solid transparent;white-space:nowrap;cursor:pointer;flex-shrink:0}
 .tab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:500}
-#canvasTab{flex:1;overflow:hidden;display:flex;flex-direction:column}
-.canvas-wrap{flex:1;display:flex;padding:6px;overflow:hidden}
-canvas#main{flex:1;min-width:0;min-height:0;border-radius:8px;border:1px solid var(--border);touch-action:none;display:block}
+#canvasTab{flex:1;overflow:hidden;display:flex;flex-direction:column;min-height:0}
+.canvas-wrap{flex:1;display:flex;align-items:center;justify-content:center;padding:6px;overflow:hidden;min-height:0}
+canvas#main{border-radius:8px;border:1px solid var(--border);touch-action:none;display:block;max-width:100%;max-height:100%}
 canvas#main.add-mode{cursor:crosshair}
 .btm{background:var(--surface);border-top:1px solid var(--border);flex-shrink:0}
 .btm-tog{display:flex;align-items:center;justify-content:space-between;padding:9px 14px;cursor:pointer;user-select:none}
@@ -124,8 +124,8 @@ canvas#shapeMap{border-radius:6px;border:1px solid var(--border);display:block;w
           <div style="margin-top:6px">
             <div class="row"><label>全幅W</label><input type="range" id="roomW" min="1" max="20" step="0.01" value="9.5" oninput="shape.w=Math.max(parseFloat(this.value),shape.nx+0.5);roomWVal.textContent=shape.w.toFixed(2)+'m';drawShapeMap();redraw();updateHStats()"><span class="val" id="roomWVal">9.50m</span></div>
             <div class="row"><label>全高H</label><input type="range" id="roomH" min="1" max="15" step="0.01" value="5.5" oninput="shape.h=Math.max(parseFloat(this.value),shape.ny+0.5);roomHVal.textContent=shape.h.toFixed(2)+'m';drawShapeMap();redraw();updateHStats()"><span class="val" id="roomHVal">5.50m</span></div>
-            <div class="row"><label>切欠X</label><input type="range" id="roomNX" min="0.5" max="19" step="0.01" value="5.5" oninput="shape.nx=Math.min(parseFloat(this.value),shape.w-0.01);roomNXVal.textContent=shape.nx.toFixed(2)+'m';drawShapeMap();redraw();updateHStats()"><span class="val" id="roomNXVal">5.50m</span></div>
-            <div class="row"><label>切欠Y</label><input type="range" id="roomNY" min="0.5" max="14" step="0.01" value="3.5" oninput="shape.ny=Math.min(parseFloat(this.value),shape.h-0.01);roomNYVal.textContent=shape.ny.toFixed(2)+'m';drawShapeMap();redraw();updateHStats()"><span class="val" id="roomNYVal">3.50m</span></div>
+            <div class="row"><label>切欠幅</label><input type="range" id="roomNX" min="0.5" max="19" step="0.01" value="4.0" oninput="shape.nx=Math.max(0.01,shape.w-parseFloat(this.value));roomNXVal.textContent=(shape.w-shape.nx).toFixed(2)+'m';drawShapeMap();redraw();updateHStats()"><span class="val" id="roomNXVal">4.00m</span></div>
+            <div class="row"><label>切欠高</label><input type="range" id="roomNY" min="0.5" max="14" step="0.01" value="2.0" oninput="shape.ny=Math.max(0.01,shape.h-parseFloat(this.value));roomNYVal.textContent=(shape.h-shape.ny).toFixed(2)+'m';drawShapeMap();redraw();updateHStats()"><span class="val" id="roomNYVal">2.00m</span></div>
           </div>
           <div class="shape-hint" id="orientHint">全幅W×全高H の矩形から右下を切り欠いたL字</div>
           <div style="display:flex;gap:5px;margin-top:7px;flex-wrap:wrap">
@@ -151,6 +151,7 @@ canvas#shapeMap{border-radius:6px;border:1px solid var(--border);display:block;w
           <div class="blbl">グリッド</div>
           <div style="display:flex;align-items:center;gap:10px">
             <button class="btn sm active" id="gridToggleBtn" onclick="toggleGrid910()" style="min-width:80px">910mm ON</button>
+            <button class="btn sm active" id="zoneToggleBtn" onclick="toggleZone()" style="min-width:80px">エリア ON</button>
             <span style="font-size:10px;color:var(--text3)">1マス = 910mm（尺モジュール）</span>
           </div>
         </div>
@@ -276,7 +277,7 @@ const PRESETS=[
   {id:"linear",name:"ラインライト",lm:900,w:10,r:1.1},
   {id:"bracket",name:"ブラケット",lm:400,w:5,r:0.75},
   {id:"ceiling",name:"シーリング",lm:4000,w:40,r:2.8},
-  {id:"ph5",name:"PH5(ルイスポールセン)",lm:1100,w:60,r:1.9,warmBias:1.5,heightAdjustable:true,defaultHeight:1.6,heightMin:0.6,heightMax:2.4},
+  {id:"ph5",name:"PH5(ルイスポールセン)",lm:1520,w:13,r:1.9,warmBias:1.5,beamType:"pendant_focused",heightAdjustable:true,defaultHeight:1.6,heightMin:0.6,heightMax:2.4},
   {id:"floor_stand",name:"スタンドライト(直接)",lm:650,w:10,r:1.0,warmBias:1.2,heightAdjustable:true,defaultHeight:1.2,heightMin:0.4,heightMax:1.8},
   {id:"floor_indirect",name:"スタンドライト(間接)",lm:350,w:7,r:0.75,warmBias:1.6,heightAdjustable:true,defaultHeight:1.4,heightMin:0.4,heightMax:1.8},
   {id:"gl_30",name:"グレアレスDL 30°",lm:800,w:9,r:0.65,beamAngle:30,beamType:"glare_narrow"},
@@ -301,13 +302,13 @@ const FURNITURE_DEFS=[
 ];
 
 // Shape: 2 rects forming L
-let shape={w:9.5,h:5.5,nx:5.5,ny:3.5};  // L字: nx=切り欠きX, ny=切り欠きY
+let shape={w:9.5,h:5.5,nx:5.5,ny:3.5,orient:0,zoneDiv1:0.22,zoneDiv2:0.52};
 
 // Zones: {id, name, base (K/D/L), color}
 let zones=[
-  {id:"K",name:"K",base:"K",color:"#059669",area:null},  // null=自動計算
-  {id:"D",name:"D",base:"D",color:"#2563eb",area:null},
-  {id:"L",name:"L",base:"L",color:"#9333ea",area:null},
+  {id:"K",name:"K",base:"K",color:"#059669",area:null,rect:{x1:0,y1:0,x2:0.22,y2:1}},
+  {id:"D",name:"D",base:"D",color:"#2563eb",area:null,rect:{x1:0.22,y1:0,x2:0.52,y2:1}},
+  {id:"L",name:"L",base:"L",color:"#9333ea",area:null,rect:{x1:0.52,y1:0,x2:1,y2:1}},
 ];
 
 let fixtures=[
@@ -328,8 +329,9 @@ let selectedId=null,selectedFId=null; // fixture or furniture selected
 let addMode=false,addFurMode=null; // addFurMode = defId string
 let addZoneId="L";
 let activeScene="all",curTab="canvas";
-let dragging=null,furDragging=null,shapeDrag=null,btmOpen=false;
+let dragging=null,furDragging=null,shapeDrag=null,zoneDrag=null,btmOpen=false;
 let showGrid910=true;
+let showZone=true;
 let statsZone="ALL";
 
 // ===== Shape helpers =====
@@ -553,11 +555,18 @@ let CW=700,CH=460;
 const PAD=42;
 
 function resizeCanvas(){
+  const wrap=document.querySelector('.canvas-wrap');
   const mC=document.getElementById('main');
-  CW=Math.max(280,mC.clientWidth||700);
-  CH=Math.max(200,mC.clientHeight||460);
-  mC.width=CW;
-  mC.height=CH;
+  const RATIO=3/2;
+  const avW=wrap.clientWidth-12;
+  const avH=wrap.clientHeight-12;
+  if(avW<=0||avH<=0)return;
+  let w=avW, h=Math.round(avW/RATIO);
+  if(h>avH){h=avH;w=Math.round(h*RATIO);}
+  CW=Math.max(200,w);
+  CH=Math.max(133,Math.round(CW/RATIO));
+  mC.width=CW;mC.height=CH;
+  mC.style.width=CW+'px';mC.style.height=CH+'px';
   redraw();
   if(btmOpen)drawShapeMap();
 }
@@ -702,7 +711,7 @@ function redraw(){
   // Heatmap
   const scene=SCENES.find(s=>s.id===activeScene);
   const cH=parseFloat(document.getElementById("ceilH").value);
-  const res=22;
+  const res=44;
   for(let ix=0;ix<res;ix++){
     for(let iy=0;iy<res;iy++){
       const rx=b.minX+(ix+.5)/res*b.totalW,ry=b.minY+(iy+.5)/res*b.totalH;
@@ -714,6 +723,9 @@ function redraw(){
         let m=scene.mult;
         if(scene.zones&&!scene.zones.includes(z.base))m=0;
         const dx=rx-f.x,dy=ry-f.y;
+        if(f.enabled===false)return;
+        const dimLv=f.dimLevel!=null?f.dimLevel:1.0;
+        if(dimLv<=0)return;
         const fh=(f.height!=null)?f.height:cH; // 器具の床からの高さ
         const horizDist=Math.sqrt(dx*dx+dy*dy);
         const dist3d=Math.sqrt(dx*dx+dy*dy+fh*fh);
@@ -751,11 +763,19 @@ function redraw(){
           const theta=Math.acos(Math.min(1,cosTheta));
           const beamFactor=Math.pow(Math.max(0,1-theta/(halfRad*1.5)),1.8);
           contrib=(p.lm*m*beamFactor*cosTheta)/(Math.PI*Math.pow(dist3d,2))*36;
+        } else if(bt==="pendant_focused"){
+          // PH5等: 傘で配光制御。真下60°以内に集中、外は急速減衰
+          const halfRad=42*Math.PI/180;
+          const theta=Math.acos(Math.min(1,cosTheta));
+          if(theta<halfRad*1.6){
+            const beamFactor=Math.pow(Math.max(0,1-theta/halfRad),3.0);
+            contrib=(p.lm*m*beamFactor*fh)/(Math.PI*Math.pow(dist3d,3))*70;
+          }
         } else {
           // 通常: Lambert余弦則
           contrib=p.lm*m*wb*fh/(Math.PI*Math.pow(dist3d,3))*42;
         }
-        lux+=contrib*wb;
+        lux+=contrib*wb*dimLv;
       });
       const cw=b.totalW*scale/res+2,ch=b.totalH*scale/res+2;
       ctx.fillStyle=luxColor(lux);
@@ -831,55 +851,43 @@ function redraw(){
   dm(tx(0)-DIM_OFF,ty(0),tx(0)-DIM_OFF,ty(S.h),S.h.toFixed(2)+"m",false);
   ctx.restore();
 
-  // Zone dividers
-  const or=shape.orient||0;
-  const kx=shape.w*0.22,dxEnd=shape.w*0.52;
-  // ゾーン境界線
-  ctx.setLineDash([5,4]);ctx.strokeStyle=zoneLineC;ctx.lineWidth=1;
-  if(or===0||or===3){
-    const yLim=or===0?Math.min(shape.ny,shape.h):shape.h;
-    ctx.beginPath();ctx.moveTo(tx(kx),ty(0));ctx.lineTo(tx(kx),ty(yLim));ctx.stroke();
-    ctx.beginPath();ctx.moveTo(tx(dxEnd),ty(0));ctx.lineTo(tx(dxEnd),ty(yLim));ctx.stroke();
-  } else {
-    const ky=shape.h*0.22,dyEnd=shape.h*0.52;
-    const xLim=or===1?Math.min(shape.nx,shape.w):shape.w;
-    ctx.beginPath();ctx.moveTo(tx(0),ty(ky));ctx.lineTo(tx(xLim),ty(ky));ctx.stroke();
-    ctx.beginPath();ctx.moveTo(tx(0),ty(dyEnd));ctx.lineTo(tx(xLim),ty(dyEnd));ctx.stroke();
+  // Zone rects — 各ゾーンを独立した矩形で描画・ドラッグ可能
+  if(showZone){
+    zones.forEach(z=>{
+      if(!z.rect)return;
+      const rx1=z.rect.x1*shape.w,ry1=z.rect.y1*shape.h;
+      const rx2=z.rect.x2*shape.w,ry2=z.rect.y2*shape.h;
+      ctx.save();lPath(ctx,tx,ty);ctx.clip();
+      ctx.fillStyle=hexToRgba(z.color,0.12);
+      ctx.fillRect(tx(rx1),ty(ry1),tx(rx2)-tx(rx1),ty(ry2)-ty(ry1));
+      ctx.strokeStyle=hexToRgba(z.color,0.55);ctx.lineWidth=1.5;ctx.setLineDash([5,4]);
+      ctx.strokeRect(tx(rx1),ty(ry1),tx(rx2)-tx(rx1),ty(ry2)-ty(ry1));
+      ctx.setLineDash([]);
+      ctx.restore();
+      const midX=(rx1+rx2)/2,midY=(ry1+ry2)/2;
+      if(isInside(midX,midY)){
+        ctx.fillStyle=hexToRgba(z.color,0.9);
+        ctx.font="bold 12px -apple-system,sans-serif";
+        ctx.fillText(z.name,tx(midX)-ctx.measureText(z.name).width/2,ty(midY)+4);
+      }
+    });
   }
-  ctx.setLineDash([]);
-
-  // Zone labels (from zones array) — orient対応
-  zones.forEach((z,i)=>{
-    let midX,midY;
-    if(or===0||or===3){
-      const kxL=shape.w*0.22,dxL=shape.w*0.52;
-      const baseRangesX={K:[0,kxL],D:[kxL,dxL],L:[dxL,shape.w]};
-      const rx=baseRangesX[z.base];if(!rx)return;
-      midX=(rx[0]+rx[1])/2;midY=shape.h/2;
-    } else {
-      const kyL=shape.h*0.22,dyL=shape.h*0.52;
-      const baseRangesY={K:[0,kyL],D:[kyL,dyL],L:[dyL,shape.h]};
-      const ry=baseRangesY[z.base];if(!ry)return;
-      midX=shape.w/2;midY=(ry[0]+ry[1])/2;
-    }
-    ctx.fillStyle=hexToRgba(z.color,0.7);
-    ctx.font="11px -apple-system,sans-serif";
-    ctx.fillText(z.name,tx(midX)-ctx.measureText(z.name).width/2,ty(midY)+4);
-  });
 
   scheduleAutoSave();
 
-  // Fixtures
+  // Fixtures（最前面）
   fixtures.forEach(f=>{
     const p=getPreset(f.presetId);
     const z=getZone(f.zone);
     const{cx,cy}=toC(f.x,f.y);
     let on=scene.mult>0;if(scene.zones&&!scene.zones.includes(z.base))on=false;
+    const fixtureOn=f.enabled!==false;
+    const dimLv=f.dimLevel!=null?f.dimLevel:1.0;
     const isSel=f.id===selectedId;
 
-    if(on){
+    if(on&&fixtureOn&&dimLv>0){
       const wb=p.warmBias||1.0;
-      const glowA=Math.min(0.40,0.20*wb);
+      const glowA=Math.min(0.40,0.20*wb)*dimLv;
       const glowR=p.beamType&&p.beamType.includes("narrow")?p.r*scale*.45:p.r*scale*.72;
       const gr=ctx.createRadialGradient(cx,cy,0,cx,cy,glowR);
       gr.addColorStop(0,"rgba(255,235,155,"+glowA.toFixed(2)+")");
@@ -888,13 +896,31 @@ function redraw(){
       ctx.fillStyle=gr;ctx.beginPath();ctx.arc(cx,cy,glowR,0,Math.PI*2);ctx.fill();
     }
     ctx.beginPath();ctx.arc(cx,cy,8,0,Math.PI*2);
-    ctx.fillStyle=on?(dk?"#ffd878":"#e8a020"):(dk?"#444":"#ccc");ctx.fill();
+    const dotColor=!fixtureOn?(dk?"#555":"#aaa"):on?(dk?"#ffd878":"#e8a020"):(dk?"#444":"#ccc");
+    ctx.fillStyle=dotColor;ctx.fill();
+    if(!fixtureOn){ctx.strokeStyle="rgba(200,80,80,0.7)";ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(cx-5,cy-5);ctx.lineTo(cx+5,cy+5);ctx.stroke();}
     ctx.strokeStyle=isSel?"#2563eb":hexToRgba(z.color,0.6);ctx.lineWidth=isSel?2.5:1.5;ctx.stroke();
     ctx.fillStyle=dk?"rgba(200,215,245,0.85)":"rgba(40,50,100,0.8)";
     ctx.font="10px monospace";
     ctx.fillText(f.label,cx+10,cy-3);
     if(f.model){ctx.fillStyle=dk?"rgba(120,160,255,0.6)":"rgba(30,60,180,0.55)";ctx.fillText(f.model,cx+10,cy+9);}
   });
+
+  // ゾーン辺ハンドル（照明の上に重ならないよう最後）
+  if(showZone){
+    zones.forEach(z=>{
+      if(!z.rect)return;
+      const rx1=z.rect.x1*shape.w,ry1=z.rect.y1*shape.h;
+      const rx2=z.rect.x2*shape.w,ry2=z.rect.y2*shape.h;
+      const midX=(rx1+rx2)/2,midY=(ry1+ry2)/2;
+      [{x:rx1,y:midY},{x:rx2,y:midY},{x:midX,y:ry1},{x:midX,y:ry2}].forEach(h=>{
+        if(!isInside(Math.max(0.01,Math.min(shape.w-0.01,h.x)),Math.max(0.01,Math.min(shape.h-0.01,h.y))))return;
+        ctx.beginPath();ctx.arc(tx(h.x),ty(h.y),7,0,Math.PI*2);
+        ctx.fillStyle="rgba(255,255,255,0.2)";ctx.fill();
+        ctx.strokeStyle=hexToRgba(z.color,0.8);ctx.lineWidth=1.5;ctx.stroke();
+      });
+    });
+  }
 }
 
 // ===== Canvas events =====
@@ -911,13 +937,13 @@ function mainDown(e){
   // Add fixture mode
   if(addMode){
     const{rx,ry}=toR(mx,my);
-    if(!isInside(rx,ry))return;
+    if(!isInside(rx,ry)&&rx>0.3&&ry>0.3&&rx<shape.w-0.3&&ry<shape.h-0.3)return;
     const z=getZone(addZoneId);
     const cnt=fixtures.filter(f=>f.zone===addZoneId).length+1;
     const pid=document.getElementById("presetSel").value;
     const pDef=getPreset(pid);
     const initH=pDef.heightAdjustable?pDef.defaultHeight:null;
-    fixtures.push({id:nextId++,presetId:pid,x:rx,y:ry,zone:addZoneId,label:z.name+"-"+cnt,model:"",height:initH});
+    fixtures.push({id:nextId++,presetId:pid,x:rx,y:ry,zone:addZoneId,label:z.name+"-"+cnt,model:"",height:initH,enabled:true,dimLevel:1.0});
     redraw();updateHStats();return;
   }
   // Add furniture mode
@@ -926,6 +952,37 @@ function mainDown(e){
     if(!isInside(rx,ry))return;
     furniture.push({id:nextFId++,defId:addFurMode,x:rx,y:ry,rot:0});
     redraw();return;
+  }
+
+  // Zone rect edge hit (addMode/addFurMode 中は無効)
+  if(!addMode&&!addFurMode){
+    const HIT=14;
+    for(const z of zones){
+      if(!z.rect)continue;
+      const rx1=z.rect.x1*shape.w,ry1=z.rect.y1*shape.h;
+      const rx2=z.rect.x2*shape.w,ry2=z.rect.y2*shape.h;
+      const midX=(rx1+rx2)/2,midY=(ry1+ry2)/2;
+      const edges=[
+        {edge:'left',  cx:toC(rx1,midY).cx, cy:toC(rx1,midY).cy},
+        {edge:'right', cx:toC(rx2,midY).cx, cy:toC(rx2,midY).cy},
+        {edge:'top',   cx:toC(midX,ry1).cx, cy:toC(midX,ry1).cy},
+        {edge:'bottom',cx:toC(midX,ry2).cx, cy:toC(midX,ry2).cy},
+      ];
+      for(const e of edges){
+        if(Math.hypot(mx-e.cx,my-e.cy)<HIT){zoneDrag={id:z.id,edge:e.edge};return;}
+      }
+    }
+  }
+
+  // Fixture hit（照明を先に判定）
+  for(let i=fixtures.length-1;i>=0;i--){
+    const f=fixtures[i];
+    const{cx,cy}=toC(f.x,f.y);
+    if(Math.hypot(mx-cx,my-cy)<14){
+      selectedId=f.id;selectedFId=null;
+      dragging={id:f.id,ox:mx-cx,oy:my-cy};
+      updateSelPanel();redraw();return;
+    }
   }
 
   // Furniture hit
@@ -941,22 +998,27 @@ function mainDown(e){
       updateSelPanel();redraw();return;
     }
   }
-
-  // Fixture hit
-  for(let i=fixtures.length-1;i>=0;i--){
-    const f=fixtures[i];
-    const{cx,cy}=toC(f.x,f.y);
-    if(Math.hypot(mx-cx,my-cy)<14){
-      selectedId=f.id;selectedFId=null;
-      dragging={id:f.id,ox:mx-cx,oy:my-cy};
-      updateSelPanel();redraw();return;
-    }
-  }
   selectedId=null;selectedFId=null;updateSelPanel();redraw();
 }
 function mainMove(e){
   e.preventDefault();
   const{mx,my}=mainEvtXY(e);
+  if(zoneDrag){
+    const{rx,ry}=toR(mx,my);
+    const z=zones.find(z=>z.id===zoneDrag.id);
+    if(z&&z.rect){
+      const MIN=0.04;
+      const fx=Math.max(0,Math.min(1,rx/shape.w));
+      const fy=Math.max(0,Math.min(1,ry/shape.h));
+      if(zoneDrag.edge==='left')   z.rect.x1=Math.min(fx,z.rect.x2-MIN);
+      if(zoneDrag.edge==='right')  z.rect.x2=Math.max(fx,z.rect.x1+MIN);
+      if(zoneDrag.edge==='top')    z.rect.y1=Math.min(fy,z.rect.y2-MIN);
+      if(zoneDrag.edge==='bottom') z.rect.y2=Math.max(fy,z.rect.y1+MIN);
+    }
+    redraw();updateHStats();
+    if(curTab==='stats')updateStats();
+    return;
+  }
   if(dragging){
     const{rx,ry}=toR(mx-dragging.ox+8,my-dragging.oy+8);
     fixtures=fixtures.map(f=>f.id===dragging.id?{...f,x:rx,y:ry}:f);redraw();
@@ -966,7 +1028,7 @@ function mainMove(e){
     furniture=furniture.map(f=>f.id===furDragging.id?{...f,x:rx,y:ry}:f);redraw();
   }
 }
-function mainUp(){dragging=null;furDragging=null;}
+function mainUp(){dragging=null;furDragging=null;zoneDrag=null;}
 const mC=document.getElementById("main");
 mC.addEventListener("mousedown",mainDown);mC.addEventListener("mousemove",mainMove);mC.addEventListener("mouseup",mainUp);mC.addEventListener("mouseleave",mainUp);
 mC.addEventListener("touchstart",mainDown,{passive:false});mC.addEventListener("touchmove",mainMove,{passive:false});mC.addEventListener("touchend",mainUp);
@@ -977,6 +1039,13 @@ function toggleGrid910(){
   const btn=document.getElementById("gridToggleBtn");
   btn.textContent=showGrid910?"910mm ON":"910mm OFF";
   btn.classList.toggle("active",showGrid910);
+  redraw();
+}
+function toggleZone(){
+  showZone=!showZone;
+  const btn=document.getElementById("zoneToggleBtn");
+  btn.textContent=showZone?"エリア ON":"エリア OFF";
+  btn.classList.toggle("active",showZone);
   redraw();
 }
 function toggleAdd(){
@@ -1035,10 +1104,17 @@ function updateSelPanel(){
   if(f){
     const p=getPreset(f.presetId);const z=getZone(f.zone);
     let html=`<b>${f.label}</b> — ${p.name}<br>${p.lm}lm / ${p.w}W / エリア: ${z.name}${f.model?"<br>型番: "+f.model:""}`;
+    const isOn=f.enabled!==false;
+    const dimLv=f.dimLevel!=null?f.dimLevel:1.0;
+    html+=`<div style="margin-top:7px;display:flex;gap:6px;align-items:center">`
+      +`<button class="btn sm" onclick="setFixtureEnabled(${!isOn})" style="flex:1;background:${isOn?'var(--accent)':'var(--border)'};color:${isOn?'#fff':'var(--text2)'}">${isOn?'ON':'OFF'}</button>`
+      +`<span style="font-size:10px;color:var(--text3);flex:2">調光: ${Math.round(dimLv*100)}%</span>`
+      +`</div>`
+      +`<input type="range" min="0" max="100" step="1" value="${Math.round(dimLv*100)}" style="width:100%;accent-color:var(--accent);margin-top:4px" oninput="setFixtureDim(this.value/100)">`;
     if(p.heightAdjustable){
       const fh=f.height!=null?f.height:p.defaultHeight;
       html+=`<div style="margin-top:7px">`
-        +`<div style="font-size:10px;color:var(--text3);margin-bottom:2px" id="fhLbl">📍 高さ: ${fh.toFixed(2)}m（床から）</div>`
+        +`<div style="font-size:10px;color:var(--text3);margin-bottom:2px" id="fhLbl">高さ: ${fh.toFixed(2)}m（床から）</div>`
         +`<input type="range" min="${p.heightMin}" max="${p.heightMax}" step="0.05" value="${fh}" style="width:100%;accent-color:var(--accent)" oninput="setFixtureHeight(this.value)">`
         +`</div>`;
     }
@@ -1103,8 +1179,19 @@ function setFixtureHeight(val){
   if(!selectedId)return;
   fixtures=fixtures.map(f=>f.id===selectedId?{...f,height:parseFloat(val)}:f);
   const el=document.getElementById("fhLbl");
-  if(el)el.textContent='📍 高さ: '+parseFloat(val).toFixed(2)+'m（床から）';
+  if(el)el.textContent='高さ: '+parseFloat(val).toFixed(2)+'m（床から）';
   redraw();updateHStats();
+}
+function setFixtureEnabled(val){
+  if(!selectedId)return;
+  fixtures=fixtures.map(f=>f.id===selectedId?{...f,enabled:val}:f);
+  updateSelPanel();redraw();updateHStats();
+}
+function setFixtureDim(val){
+  if(!selectedId)return;
+  const v=Math.max(0,Math.min(1,parseFloat(val)));
+  fixtures=fixtures.map(f=>f.id===selectedId?{...f,dimLevel:v}:f);
+  updateSelPanel();redraw();updateHStats();
 }
 
 function toggleBtm(){
@@ -1112,6 +1199,7 @@ function toggleBtm(){
   document.getElementById("btmBody").classList.toggle("open",btmOpen);
   document.getElementById("btmArr").classList.toggle("open",btmOpen);
   if(btmOpen)initShapeMap();
+  requestAnimationFrame(()=>resizeCanvas());
 }
 function setTab(t,el){
   curTab=t;
@@ -1127,12 +1215,14 @@ function setTab(t,el){
 function updateHStats(){
   const totW=fixtures.reduce((s,f)=>s+getPreset(f.presetId).w,0);
   const scene=SCENES.find(s=>s.id===activeScene);
-  const area=shape.w*shape.h;
+  const area=shape.w*shape.h-(shape.w-shape.nx)*(shape.h-shape.ny);
   let effLm=0;
   fixtures.forEach(f=>{
     const p=getPreset(f.presetId);const z=getZone(f.zone);
+    const dimLv=f.dimLevel!=null?f.dimLevel:1.0;
+    if(f.enabled===false||dimLv<=0)return;
     let m=scene.mult;if(scene.zones&&!scene.zones.includes(z.base))m=0;
-    effLm+=p.lm*m;
+    effLm+=p.lm*m*dimLv;
   });
   document.getElementById("hW").textContent=totW+"W";
   document.getElementById("hLx").textContent=Math.round(effLm/area)+" lx";
@@ -1204,7 +1294,7 @@ function addZoneArea(){
   const colors=[baseC,...ZONE_EXTRA_COLORS];
   const usedColors=zones.filter(z=>z.base===base).map(z=>z.color);
   const color=colors.find(c=>!usedColors.includes(c))||ZONE_EXTRA_COLORS[zoneColorIdx++%ZONE_EXTRA_COLORS.length];
-  zones.push({id:name,name,base,color,area:null});
+  zones.push({id:name,name,base,color,area:null,rect:{x1:0.1,y1:0.1,x2:0.9,y2:0.9}});
   document.getElementById("newZoneName").value="";
   renderZoneBtns();redraw();
 }
@@ -1227,10 +1317,24 @@ function updateList(){
 
 // ===== Stats =====
 function getZoneAutoArea(z){
-  // L字全体面積 = w*h - (w-nx)*(h-ny)
-  const totalArea=shape.w*shape.h-(shape.w-shape.nx)*(shape.h-shape.ny);
-  const ratio={K:0.22,D:0.30,L:0.48};
-  return totalArea*(ratio[z.base]||0.33);
+  if(!z.rect) return 10;
+  const S=shape, or=S.orient||0;
+  const rx1=z.rect.x1*S.w, ry1=z.rect.y1*S.h;
+  const rx2=z.rect.x2*S.w, ry2=z.rect.y2*S.h;
+  // 縦ストリップ積分でL字との交差面積を計算
+  const steps=60;
+  const dx=(rx2-rx1)/steps;
+  let area=0;
+  for(let i=0;i<steps;i++){
+    const xi=rx1+(i+0.5)*dx;
+    let yMin=0,yMax=S.h;
+    if(or===0){      if(xi>=S.nx)       yMax=S.ny; }
+    else if(or===1){ if(xi<=(S.w-S.nx)) yMin=S.ny; }
+    else if(or===2){ if(xi<=(S.w-S.nx)) yMax=S.h-S.ny; }
+    else {           if(xi>=S.nx)       yMin=S.h-S.ny; }
+    area+=Math.max(0,Math.min(ry2,yMax)-Math.max(ry1,yMin))*dx;
+  }
+  return Math.max(0.01,area);
 }
 function getZoneLux(zoneId){
   const scene=SCENES.find(s=>s.id===activeScene);
@@ -1384,6 +1488,32 @@ const DAIKO_DB=[
   {model:"DPN-38428",name:"ペンダント 昼白色",lm:1200,w:12.0,presetId:"pendant"},
   {model:"DCL-38487",name:"シーリングライト 〜12畳",lm:4000,w:42,presetId:"ceiling"},
   {model:"DCL-38488",name:"シーリングライト 〜14畳 高演色",lm:5000,w:52,presetId:"ceiling"},
+  // ときめきシリーズ Ra96
+  {model:"DDL-8791YW",name:"ときめきDL φ75 60° 電球色 Ra96",lm:250,w:4.8,presetId:"dl_s"},
+  {model:"DDL-8791AW",name:"ときめきDL φ75 60° 白色 Ra96",lm:280,w:4.8,presetId:"dl_s"},
+  {model:"DDL-8793YW",name:"ときめきDL φ75 60° 電球色 Ra96 調光",lm:310,w:4.8,presetId:"dl_s"},
+  {model:"DDL-8794AW",name:"ときめきDL φ100 60° 白色 Ra96",lm:590,w:7.6,presetId:"dl_m"},
+  {model:"DDL-5792YW",name:"ときめきDL φ75 60° 電球色 Ra96 調光",lm:520,w:8.5,presetId:"dl_s"},
+  {model:"DDL-5792AW",name:"ときめきDL φ75 60° 白色 Ra96 調光",lm:590,w:8.5,presetId:"dl_m"},
+  {model:"DDL-5297YWG",name:"ときめきグレアレスDL 30° 電球色 Ra96",lm:170,w:5.8,presetId:"gl_30"},
+  // グレアレス新型
+  {model:"DDL-5300YWG",name:"グレアレスDL φ75 25° 電球色 Ra96",lm:210,w:5.8,presetId:"gl_30"},
+  {model:"DDL-5444YWG",name:"グレアレスDL φ75 ユニバーサル 25° 電球色",lm:420,w:5.0,presetId:"gl_30"},
+  {model:"DDL-6232YWG",name:"グレアレスDL φ75 準耐火 Ra93 電球色",lm:340,w:5.8,presetId:"gl_30"},
+  {model:"DDL-8795YWE",name:"グレアレスDL φ50 25° 電球色",lm:340,w:5.9,presetId:"gl_30"},
+  // ソフトグレアレス新型
+  {model:"DDL-5531YWG",name:"ソフトグレアレスDL φ75 45° 電球色 NANA-GO",lm:520,w:7.8,presetId:"sgl_50"},
+  {model:"DDL-5599YW",name:"ベースDL φ75 60° 電球色 NANA-GO",lm:680,w:6.8,presetId:"dl_s"},
+  // φ75/φ100 標準新型
+  {model:"DDL-8790YW",name:"ダウンライト φ75 60° 電球色",lm:610,w:7.6,presetId:"dl_s"},
+  {model:"DDL-8790AW",name:"ダウンライト φ75 60° 白色",lm:620,w:7.6,presetId:"dl_s"},
+  {model:"DDL-8790WW",name:"ダウンライト φ75 60° 昼白色",lm:630,w:7.6,presetId:"dl_s"},
+  {model:"DDL-5102YW",name:"ダウンライト φ100 60° 電球色",lm:640,w:7.6,presetId:"dl_m"},
+  {model:"DDL-4790YWG",name:"ダウンライト φ100 60° 電球色 調光",lm:580,w:8.5,presetId:"dl_m"},
+  // スポットライト DSL系（現行）
+  {model:"DSL-5325YW",name:"スポットライト 60° 電球色 プラグ",lm:560,w:8.1,presetId:"spot"},
+  {model:"DSL-5395YWG",name:"スポットライト 30° 電球色 調光",lm:650,w:8.7,presetId:"spot"},
+  {model:"DSL-5524FWG",name:"スポットライト 60° 楽調 傾斜天井対応",lm:700,w:8.0,presetId:"spot"},
 ];
 
 function searchDaiko(){
@@ -1435,7 +1565,7 @@ function getAppState(){
     furniture:furniture.map(f=>({...f})),
     zones:zones.map(z=>({...z})),
     heatConfig:{...heatConfig},
-    activeScene,showGrid910,densityUnit,
+    activeScene,showGrid910,showZone,densityUnit,
     ceilH:parseFloat(document.getElementById('ceilH').value),
     nextId,nextFId,
   };
@@ -1449,6 +1579,7 @@ function applyAppState(s){
   heatConfig={...heatConfig,...s.heatConfig};
   activeScene=s.activeScene||'all';
   showGrid910=s.showGrid910!==undefined?s.showGrid910:true;
+  showZone=s.showZone!==undefined?s.showZone:true;
   densityUnit=s.densityUnit||'m2';
   nextId=s.nextId||Math.max(20,...fixtures.map(f=>f.id))+1;
   nextFId=s.nextFId||Math.max(10,...furniture.map(f=>f.id))+1;
@@ -1462,10 +1593,12 @@ function applyAppState(s){
 function syncUI(){
   document.getElementById('roomW').value=shape.w;document.getElementById('roomWVal').textContent=shape.w.toFixed(2)+'m';
   document.getElementById('roomH').value=shape.h;document.getElementById('roomHVal').textContent=shape.h.toFixed(2)+'m';
-  document.getElementById('roomNX').value=shape.nx;document.getElementById('roomNXVal').textContent=shape.nx.toFixed(2)+'m';
-  document.getElementById('roomNY').value=shape.ny;document.getElementById('roomNYVal').textContent=shape.ny.toFixed(2)+'m';
+  document.getElementById('roomNX').value=(shape.w-shape.nx).toFixed(2);document.getElementById('roomNXVal').textContent=(shape.w-shape.nx).toFixed(2)+'m';
+  document.getElementById('roomNY').value=(shape.h-shape.ny).toFixed(2);document.getElementById('roomNYVal').textContent=(shape.h-shape.ny).toFixed(2)+'m';
   const gb=document.getElementById('gridToggleBtn');
   gb.textContent=showGrid910?'910mm ON':'910mm OFF';gb.classList.toggle('active',showGrid910);
+  const zb=document.getElementById('zoneToggleBtn');
+  zb.textContent=showZone?'エリア ON':'エリア OFF';zb.classList.toggle('active',showZone);
   document.querySelectorAll('#sceneBtns .btn').forEach((b,i)=>{b.classList.toggle('active',SCENES[i]&&SCENES[i].id===activeScene);});
   const mls=document.getElementById('maxLuxSlider');
   if(mls){mls.value=heatConfig.maxLux;document.getElementById('maxLuxVal').textContent=heatConfig.maxLux;}
@@ -1545,9 +1678,11 @@ try{
   if(saved){applyAppState(JSON.parse(saved));}
 }catch(e){}
 
-resizeCanvas();
-initShapeMap();
-updateHStats();
+requestAnimationFrame(()=>requestAnimationFrame(()=>{
+  resizeCanvas();
+  initShapeMap();
+  updateHStats();
+}));
 </script>
 </body>
 </html>
