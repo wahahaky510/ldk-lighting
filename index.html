@@ -398,6 +398,62 @@ function isInside(rx,ry){
   return true;
 }
 function getPreset(id){return PRESETS.find(p=>p.id===id)||PRESETS[1]}
+
+function parseIES(text){
+  const lines=text.split(/\r?\n/).map(l=>l.trim()).filter(l=>l.length>0);
+  let i=0;
+  while(i<lines.length&&!lines[i].startsWith('TILT='))i++;
+  if(i>=lines.length)throw new Error('TILT行が見つかりません');
+  i++;
+  // 数値行を結合してトークン列に
+  const tokens=[];
+  while(i<lines.length){
+    lines[i].split(/\s+/).forEach(t=>{const v=parseFloat(t);if(!isNaN(v))tokens.push(v);});
+    i++;
+  }
+  let ti=0;
+  const numLamps=tokens[ti++];
+  const lumensPerLamp=tokens[ti++];
+  const candelaMultiplier=tokens[ti++];
+  const numV=tokens[ti++];
+  const numH=tokens[ti++];
+  ti+=5; // photometricType, unitsType, width, length, height
+  ti+=2; // ballastFactor, futureUse
+  const watts=tokens[ti++];
+  const vAngles=tokens.slice(ti,ti+numV);ti+=numV;
+  const hAngles=tokens.slice(ti,ti+numH);ti+=numH;
+  const candela=[];
+  for(let h=0;h<numH;h++){
+    candela.push(tokens.slice(ti,ti+numV).map(c=>c*candelaMultiplier));
+    ti+=numV;
+  }
+  if(candela.length===0)throw new Error('配光データがありません');
+  return{lumens:numLamps*lumensPerLamp,watts,vAngles,hAngles,candela};
+}
+
+function interpolateIES(ies,thetaDeg,phiDeg){
+  const{vAngles,hAngles,candela}=ies;
+  thetaDeg=Math.max(vAngles[0],Math.min(vAngles[vAngles.length-1],thetaDeg));
+  let vi=0;
+  while(vi<vAngles.length-1&&vAngles[vi+1]<thetaDeg)vi++;
+  const vt=vAngles[vi]===vAngles[vi+1]?0:(thetaDeg-vAngles[vi])/(vAngles[vi+1]-vAngles[vi]);
+  const vi2=Math.min(vi+1,vAngles.length-1);
+
+  if(hAngles.length<=1){
+    return candela[0][vi]*(1-vt)+candela[0][vi2]*vt;
+  }
+  const hMax=hAngles[hAngles.length-1];
+  if(hMax<=90)phiDeg=phiDeg%90;
+  else if(hMax<=180)phiDeg=phiDeg%180;
+  phiDeg=Math.max(hAngles[0],Math.min(hMax,phiDeg));
+  let hi=0;
+  while(hi<hAngles.length-1&&hAngles[hi+1]<phiDeg)hi++;
+  const hi2=Math.min(hi+1,hAngles.length-1);
+  const ht=hAngles[hi]===hAngles[hi2]?0:(phiDeg-hAngles[hi])/(hAngles[hi2]-hAngles[hi]);
+  const c00=candela[hi][vi],c01=candela[hi][vi2];
+  const c10=candela[hi2][vi],c11=candela[hi2][vi2];
+  return c00*(1-vt)*(1-ht)+c01*vt*(1-ht)+c10*(1-vt)*ht+c11*vt*ht;
+}
 function getZone(id){return zones.find(z=>z.id===id)||zones[0]}
 function isDark(){return window.matchMedia("(prefers-color-scheme:dark)").matches}
 
@@ -741,12 +797,23 @@ function redraw(){
         if(f.enabled===false)return;
         const dimLv=f.dimLevel!=null?f.dimLevel:1.0;
         if(dimLv<=0)return;
-        const fh=(f.height!=null)?f.height:cH; // 器具の床からの高さ
+        const fh=(f.height!=null)?f.height:cH;
         const horizDist=Math.sqrt(dx*dx+dy*dy);
         const dist3d=Math.sqrt(dx*dx+dy*dy+fh*fh);
         const cosTheta=fh/dist3d;
         const wb=p.warmBias||1.0;
         let contrib=0;
+
+        // IESデータがあれば優先使用
+        if(f.iesData){
+          const thetaDeg=Math.acos(Math.min(1,cosTheta))*180/Math.PI;
+          const phiDeg=Math.abs(Math.atan2(dy,dx)*180/Math.PI);
+          const cd=interpolateIES(f.iesData,thetaDeg,phiDeg);
+          contrib=cd*m*cosTheta/(dist3d*dist3d);
+          lux+=contrib*dimLv;
+          return;
+        }
+
         const bt=p.beamType||"cosine";
         if(bt==="glare_narrow"){
           // 30度ビーム: 半角15度相当、急峻なコサイン集光
@@ -1152,6 +1219,15 @@ function updateSelPanel(){
         +`<input type="range" min="${p.heightMin}" max="${p.heightMax}" step="0.05" value="${fh}" style="width:100%;accent-color:var(--accent)" oninput="setFixtureHeight(this.value)">`
         +`</div>`;
     }
+    html+=`<div style="margin-top:8px;border-top:1px solid var(--border);padding-top:7px">`
+      +`<div style="font-size:10px;color:var(--text3);margin-bottom:4px">IES配光データ</div>`
+      +`<div style="display:flex;gap:5px">`
+      +`<button class="btn sm" onclick="loadIES()" style="flex:1">読み込む</button>`
+      +(f.iesData?`<button class="btn sm" onclick="clearIES()" style="flex:1;color:#ef4444">クリア</button>`:'')
+      +`</div>`
+      +(f.iesData?`<div style="font-size:10px;color:#22c55e;margin-top:4px">✓ ${f.iesName||'IES読み込み済み'}</div>`
+                 :`<div style="font-size:10px;color:var(--text3);margin-top:4px">未設定（メーカー近似値を使用）</div>`)
+      +`</div>`;
     document.getElementById("selInfo").innerHTML=html;
   }
   if(ff){
@@ -1225,6 +1301,29 @@ function setFixtureDim(val){
   if(!selectedId)return;
   const v=Math.max(0,Math.min(1,parseFloat(val)));
   fixtures=fixtures.map(f=>f.id===selectedId?{...f,dimLevel:v}:f);
+  updateSelPanel();redraw();updateHStats();
+}
+function loadIES(){
+  if(!selectedId)return;
+  const input=document.createElement('input');
+  input.type='file';input.accept='.ies,.IES';
+  input.onchange=e=>{
+    const file=e.target.files[0];if(!file)return;
+    const reader=new FileReader();
+    reader.onload=ev=>{
+      try{
+        const data=parseIES(ev.target.result);
+        fixtures=fixtures.map(f=>f.id===selectedId?{...f,iesData:data,iesName:file.name}:f);
+        updateSelPanel();redraw();updateHStats();
+      }catch(err){alert('IES読み込みエラー: '+err.message);}
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+function clearIES(){
+  if(!selectedId)return;
+  fixtures=fixtures.map(f=>f.id===selectedId?{...f,iesData:null,iesName:null}:f);
   updateSelPanel();redraw();updateHStats();
 }
 
@@ -1595,7 +1694,7 @@ function getAppState(){
   return{
     v:2,
     shape:{...shape},
-    fixtures:fixtures.map(f=>({...f})),
+    fixtures:fixtures.map(f=>{const{iesData,iesName,...rest}=f;return rest;}),
     furniture:furniture.map(f=>({...f})),
     zones:zones.map(z=>({...z})),
     heatConfig:{...heatConfig},
