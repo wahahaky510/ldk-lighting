@@ -849,18 +849,37 @@ function redraw(){
     else{ctx.save();ctx.translate(mx,my);ctx.rotate(-Math.PI/2);ctx.fillText(label,-tw/2,-4);ctx.restore();}
   };
   const S=shape;
-  // 上辺: (0,0)→(w,0)
-  dm(tx(0),ty(0)-DIM_OFF,tx(S.w),ty(0)-DIM_OFF,S.w.toFixed(2)+"m",true);
-  // 右上辺: (w,0)→(w,ny)
-  dm(tx(S.w)+DIM_OFF,ty(0),tx(S.w)+DIM_OFF,ty(S.ny),S.ny.toFixed(2)+"m",false);
-  // 切り欠き横: (w,ny)→(nx,ny) — 内側なのでテキスト内側へ
-  dm(tx(S.nx),ty(S.ny)+DIM_OFF*0.8,tx(S.w),ty(S.ny)+DIM_OFF*0.8,(S.w-S.nx).toFixed(2)+"m",true);
-  // 切り欠き縦: (nx,ny)→(nx,h)
-  dm(tx(S.nx)+DIM_OFF,ty(S.ny),tx(S.nx)+DIM_OFF,ty(S.h),(S.h-S.ny).toFixed(2)+"m",false);
-  // 下辺: (nx,h)→(0,h)
-  dm(tx(0),ty(S.h)+DIM_OFF,tx(S.nx),ty(S.h)+DIM_OFF,S.nx.toFixed(2)+"m",true);
-  // 左辺: (0,h)→(0,0)
-  dm(tx(0)-DIM_OFF,ty(0),tx(0)-DIM_OFF,ty(S.h),S.h.toFixed(2)+"m",false);
+  const or=S.orient||0;
+  const DO=DIM_OFF,DI=DIM_OFF*0.8;
+  if(or===0){ // 右下切欠
+    dm(tx(0),ty(0)-DO,tx(S.w),ty(0)-DO,S.w.toFixed(2)+"m",true);
+    dm(tx(S.w)+DO,ty(0),tx(S.w)+DO,ty(S.ny),S.ny.toFixed(2)+"m",false);
+    dm(tx(S.nx),ty(S.ny)+DI,tx(S.w),ty(S.ny)+DI,(S.w-S.nx).toFixed(2)+"m",true);
+    dm(tx(S.nx)+DO,ty(S.ny),tx(S.nx)+DO,ty(S.h),(S.h-S.ny).toFixed(2)+"m",false);
+    dm(tx(0),ty(S.h)+DO,tx(S.nx),ty(S.h)+DO,S.nx.toFixed(2)+"m",true);
+    dm(tx(0)-DO,ty(0),tx(0)-DO,ty(S.h),S.h.toFixed(2)+"m",false);
+  }else if(or===1){ // 左下切欠
+    dm(tx(S.w-S.nx),ty(0)-DO,tx(S.w),ty(0)-DO,S.nx.toFixed(2)+"m",true);
+    dm(tx(S.w)+DO,ty(0),tx(S.w)+DO,ty(S.h),S.h.toFixed(2)+"m",false);
+    dm(tx(0),ty(S.h)+DO,tx(S.w),ty(S.h)+DO,S.w.toFixed(2)+"m",true);
+    dm(tx(0)-DO,ty(S.ny),tx(0)-DO,ty(S.h),(S.h-S.ny).toFixed(2)+"m",false);
+    dm(tx(0),ty(S.ny)-DI,tx(S.w-S.nx),ty(S.ny)-DI,(S.w-S.nx).toFixed(2)+"m",true);
+    dm(tx(S.w-S.nx)-DO,ty(0),tx(S.w-S.nx)-DO,ty(S.ny),S.ny.toFixed(2)+"m",false);
+  }else if(or===2){ // 左上切欠
+    dm(tx(S.w-S.nx),ty(0)-DO,tx(S.w),ty(0)-DO,S.nx.toFixed(2)+"m",true);
+    dm(tx(S.w)+DO,ty(0),tx(S.w)+DO,ty(S.h),S.h.toFixed(2)+"m",false);
+    dm(tx(0),ty(S.h)+DO,tx(S.w),ty(S.h)+DO,S.w.toFixed(2)+"m",true);
+    dm(tx(0)-DO,ty(0),tx(0)-DO,ty(S.h-S.ny),(S.h-S.ny).toFixed(2)+"m",false);
+    dm(tx(0),ty(S.h-S.ny)-DI,tx(S.w-S.nx),ty(S.h-S.ny)-DI,(S.w-S.nx).toFixed(2)+"m",true);
+    dm(tx(S.w-S.nx)-DO,ty(0),tx(S.w-S.nx)-DO,ty(S.h-S.ny),(S.h-S.ny).toFixed(2)+"m",false);
+  }else{ // 3: 右上切欠
+    dm(tx(0),ty(0)-DO,tx(S.nx),ty(0)-DO,S.nx.toFixed(2)+"m",true);
+    dm(tx(0)-DO,ty(0),tx(0)-DO,ty(S.h),S.h.toFixed(2)+"m",false);
+    dm(tx(0),ty(S.h)+DO,tx(S.w),ty(S.h)+DO,S.w.toFixed(2)+"m",true);
+    dm(tx(S.w)+DO,ty(S.h-S.ny),tx(S.w)+DO,ty(S.h),S.ny.toFixed(2)+"m",false);
+    dm(tx(S.nx),ty(S.h-S.ny)-DI,tx(S.w),ty(S.h-S.ny)-DI,(S.w-S.nx).toFixed(2)+"m",true);
+    dm(tx(S.nx)+DO,ty(0),tx(S.nx)+DO,ty(S.h-S.ny),(S.h-S.ny).toFixed(2)+"m",false);
+  }
   ctx.restore();
 
   // Zone rects — 各ゾーンを独立した矩形で描画・ドラッグ可能
