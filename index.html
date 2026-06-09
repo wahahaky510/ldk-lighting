@@ -140,6 +140,7 @@ canvas#shapeMap{border-radius:6px;border:1px solid var(--border);display:block;w
         <div class="bsec">
           <div class="blbl">天井高</div>
           <div class="row"><label>天井高</label><input type="range" id="ceilH" min="2.0" max="3.2" step="0.05" value="2.4" oninput="ceilHVal.textContent=parseFloat(this.value).toFixed(2)+'m';redraw();updateHStats()"><span class="val" id="ceilHVal">2.40m</span></div>
+          <div class="row"><label>測定面高さ</label><input type="range" id="measH" min="0" max="1.2" step="0.05" value="0" oninput="measHVal.textContent=parseFloat(this.value).toFixed(2)+'m';redraw();updateHStats()"><span class="val" id="measHVal">0.00m</span></div>
         </div>
 
         <!-- Scene -->
@@ -795,6 +796,7 @@ function redraw(){
   // Heatmap
   const scene=SCENES.find(s=>s.id===activeScene);
   const cH=parseFloat(document.getElementById("ceilH").value);
+  const measH=parseFloat(document.getElementById("measH").value)||0;
   const res=44;
   // IES器具の天井反射による均一環境光を事前計算
   const REFLECT=0.45; // 部屋平均反射率（天井0.7・壁0.5・床0.3の組み合わせ）
@@ -823,7 +825,7 @@ function redraw(){
         if(f.enabled===false)return;
         const dimLv=f.dimLevel!=null?f.dimLevel:1.0;
         if(dimLv<=0)return;
-        const fh=(f.height!=null)?f.height:cH;
+        const fh=Math.max(0.01,(f.height!=null?f.height:cH)-measH);
         const horizDist=Math.sqrt(dx*dx+dy*dy);
         const dist3d=Math.sqrt(dx*dx+dy*dy+fh*fh);
         const cosTheta=fh/dist3d;
@@ -1726,6 +1728,7 @@ function getAppState(){
     heatConfig:{...heatConfig},
     activeScene,showGrid910,showZone,densityUnit,
     ceilH:parseFloat(document.getElementById('ceilH').value),
+    measH:parseFloat(document.getElementById('measH').value)||0,
     nextId,nextFId,
   };
 }
@@ -1745,6 +1748,10 @@ function applyAppState(s){
   if(s.ceilH!=null){
     document.getElementById('ceilH').value=s.ceilH;
     document.getElementById('ceilHVal').textContent=s.ceilH.toFixed(2)+'m';
+  }
+  if(s.measH!=null){
+    document.getElementById('measH').value=s.measH;
+    document.getElementById('measHVal').textContent=s.measH.toFixed(2)+'m';
   }
   syncUI();
   return true;
