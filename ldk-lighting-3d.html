@@ -73,17 +73,17 @@ html,body{width:100%;height:100%;overflow:hidden;background:#08080d;font-family:
   <div class="ui-body">
     <div class="sec">視点</div>
     <div class="vbtns">
-      <button class="vbtn act" onclick="setView('corner')">コーナー</button>
+      <button class="vbtn act" onclick="setView('inside')">室内</button>
+      <button class="vbtn" onclick="setView('kitchen')">キッチン側</button>
       <button class="vbtn" onclick="setView('top')">真上</button>
-      <button class="vbtn" onclick="setView('eye')">目線</button>
-      <button class="vbtn" onclick="setView('front')">正面</button>
+      <button class="vbtn" onclick="setView('outside')">外から</button>
     </div>
 
     <div class="sec">表示</div>
     <div class="trow"><span class="tlbl">照度マップ（床）</span>
       <label class="tsw"><input type="checkbox" id="ckHeat" checked onchange="toggleLayer('heat',this.checked)"><span></span></label></div>
     <div class="trow"><span class="tlbl">天井を表示</span>
-      <label class="tsw"><input type="checkbox" id="ckCeil" onchange="toggleLayer('ceil',this.checked)"><span></span></label></div>
+      <label class="tsw"><input type="checkbox" id="ckCeil" checked onchange="toggleLayer('ceil',this.checked)"><span></span></label></div>
     <div class="trow"><span class="tlbl">家具を表示</span>
       <label class="tsw"><input type="checkbox" id="ckFur" checked onchange="toggleLayer('fur',this.checked)"><span></span></label></div>
     <div class="trow"><span class="tlbl">910mmグリッド</span>
@@ -289,9 +289,9 @@ const camera = new THREE.PerspectiveCamera(48, 1, 0.05, 60);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.07;
-controls.minDistance = 1.2;
+controls.minDistance = 0.1;
 controls.maxDistance = 22;
-controls.maxPolarAngle = Math.PI * 0.87;
+controls.maxPolarAngle = Math.PI * 0.98;
 
 // Scene object groups for layer toggling
 const groups = {heat: null, ceil: null, fur: null, fx: null, grid: null};
@@ -581,7 +581,7 @@ function rebuild() {
   buildFxUI();
   // Restore toggle states
   if(groups.heat) groups.heat.visible = document.getElementById('ckHeat').checked;
-  if(groups.ceil) { groups.ceil.children[0] && (groups.ceil.children[0].visible = document.getElementById('ckCeil').checked); }
+  if(groups.ceil) groups.ceil.children.forEach(c => c.visible = document.getElementById('ckCeil').checked);
   if(groups.fur)  groups.fur.visible  = document.getElementById('ckFur').checked;
   if(groups.grid) groups.grid.visible = document.getElementById('ckGrid').checked;
 }
@@ -668,20 +668,21 @@ window.setView = (preset) => {
   document.querySelectorAll('.vbtn').forEach(b => b.classList.remove('act'));
   event.target.classList.add('act');
   const cx = S.w / 2, cz = S.h / 2;
-  controls.target.set(cx, 0.5, cz);
-  if(preset === 'corner') {
-    // SE corner above – shows full floor heatmap
-    camera.position.set(S.w + 1.5, 5.5, S.h + 2.5);
+  if(preset === 'inside') {
+    // リビング奥から室内全体を見渡す
+    camera.position.set(2.0, 1.55, 1.2);
+    controls.target.set(4.0, 1.4, 6.5);
+  } else if(preset === 'kitchen') {
+    // キッチン側からリビングを見る
+    camera.position.set(3.5, 1.55, 8.5);
+    controls.target.set(4.0, 1.4, 3.0);
   } else if(preset === 'top') {
-    camera.position.set(cx, 11, cz + 0.001);
+    camera.position.set(cx, 10, cz + 0.001);
     controls.target.set(cx, 0, cz);
-  } else if(preset === 'eye') {
-    // Eye-level view from south
-    camera.position.set(cx, 1.55, S.h + 3.5);
-    controls.target.set(cx, 1.4, cz);
-  } else if(preset === 'front') {
-    // Elevated front (south) view
-    camera.position.set(cx, 3.5, S.h + 4);
+  } else if(preset === 'outside') {
+    // SE外から俯瞰
+    camera.position.set(S.w + 1.5, 5.5, S.h + 2.5);
+    controls.target.set(cx, 0.5, cz);
   }
   controls.update();
 };
@@ -752,9 +753,9 @@ window._dbg = {get scene(){return scene;}, get camera(){return camera;}, get con
 
 function start() {
   onResize();
-  const cx = S.w / 2, cz = S.h / 2;
-  camera.position.set(S.w + 1.5, 5.5, S.h + 2.5);
-  controls.target.set(cx, 0.5, cz);
+  // 室内視点（リビング奥から）
+  camera.position.set(2.0, 1.55, 1.2);
+  controls.target.set(4.0, 1.4, 6.5);
   controls.update();
   rebuild();
   document.getElementById('loadingMsg').style.display = 'none';
