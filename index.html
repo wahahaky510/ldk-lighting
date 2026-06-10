@@ -259,12 +259,19 @@ canvas#shapeMap{border-radius:6px;border:1px solid var(--border);display:block;w
         <div style="font-size:11px;color:var(--text2);margin-bottom:7px">ファイルへの書き出し / 読み込み</div>
         <div style="display:flex;gap:6px">
           <button class="btn sm active" onclick="exportState()" style="flex:1">⬇ JSONで書き出し</button>
-          <button class="btn sm" onclick="importState()" style="flex:1">⬆ JSONを読み込み</button>
+          <button class="btn sm" onclick="importState()" style="flex:1">⬆ ファイルから読み込み</button>
+        </div>
+        <div style="margin-top:6px">
+          <button class="btn sm" onclick="togglePasteArea()" style="width:100%">📋 テキストを貼り付けて読み込み</button>
+        </div>
+        <div id="pasteArea" style="display:none;margin-top:6px">
+          <textarea id="pasteJson" placeholder="ここにJSONを貼り付け..." style="width:100%;height:80px;box-sizing:border-box;padding:6px;border-radius:8px;border:1px solid var(--border2);background:var(--surface2);color:var(--text);font-size:11px;font-family:monospace;resize:vertical;outline:none"></textarea>
+          <button class="btn sm active" onclick="importFromPaste()" style="width:100%;margin-top:4px">読み込む</button>
         </div>
         <div style="margin-top:6px">
           <button class="btn sm" onclick="exportDXF()" style="width:100%">⬇ DXFで書き出し（DIALux用）</button>
         </div>
-        <div style="font-size:10px;color:var(--text3);margin-top:6px">書き出したJSONファイルを別のブラウザ・PCで読み込むことができます。</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:6px">書き出したJSONを他のブラウザやスマホに貼り付けて読み込めます。</div>
       </div>
     </div>
   </div>
@@ -1859,6 +1866,25 @@ function exportDXF(){
   a.href='data:application/dxf;charset=utf-8,'+encodeURIComponent(dxf);
   a.download='ldk-lighting-'+date+'.dxf';
   a.click();
+}
+function togglePasteArea(){
+  const el=document.getElementById('pasteArea');
+  el.style.display=el.style.display==='none'?'block':'none';
+}
+function importFromPaste(){
+  const text=document.getElementById('pasteJson').value.trim();
+  if(!text){alert('JSONを貼り付けてください');return;}
+  try{
+    const s=JSON.parse(text);
+    if(applyAppState(s)){
+      redraw();updateHStats();
+      if(curTab==='list')updateList();
+      if(curTab==='stats')updateStats();
+      if(curTab==='settings')drawLegend();
+      document.getElementById('pasteArea').style.display='none';
+      document.getElementById('pasteJson').value='';
+    }else{alert('非対応のファイル形式です（v2形式が必要）');}
+  }catch(err){alert('読み込みエラー: '+err.message);}
 }
 function importState(){
   const input=document.createElement('input');
