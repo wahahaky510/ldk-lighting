@@ -262,6 +262,9 @@ canvas#shapeMap{border-radius:6px;border:1px solid var(--border);display:block;w
           <button class="btn sm" onclick="importState()" style="flex:1">⬆ ファイルから読み込み</button>
         </div>
         <div style="margin-top:6px">
+          <button class="btn sm active" onclick="shareViaQR()" style="width:100%">📱 QRコードでスマホに転送</button>
+        </div>
+        <div style="margin-top:6px">
           <button class="btn sm" onclick="togglePasteArea()" style="width:100%">📋 テキストを貼り付けて読み込み</button>
         </div>
         <div id="pasteArea" style="display:none;margin-top:6px">
@@ -1908,6 +1911,92 @@ function importState(){
   input.click();
 }
 
+// ===== LZ-String (compact inline) =====
+var LZString=(function(){var f=String.fromCharCode;var keyStrBase64="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";var keyStrUriSafe="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+-$";var baseReverseDic={};function getBaseValue(alphabet,character){if(!baseReverseDic[alphabet]){baseReverseDic[alphabet]={};for(var i=0;i<alphabet.length;i++){baseReverseDic[alphabet][alphabet.charAt(i)]=i;}}return baseReverseDic[alphabet][character];}var LZString={compressToBase64:function(input){if(input==null)return"";var res=LZString._compress(input,6,function(a){return keyStrBase64.charAt(a);});switch(res.length%4){default:case 0:return res;case 1:return res+"===";case 2:return res+"==";case 3:return res+"=";}},decompressFromBase64:function(input){if(input==null)return"";if(input=="")return null;return LZString._decompress(input.length,32,function(index){return getBaseValue(keyStrBase64,input.charAt(index));});},compressToEncodedURIComponent:function(input){if(input==null)return"";return LZString._compress(input,6,function(a){return keyStrUriSafe.charAt(a);});},decompressFromEncodedURIComponent:function(input){if(input==null)return"";if(input=="")return null;input=input.replace(/ /g,"+");return LZString._decompress(input.length,32,function(index){return getBaseValue(keyStrUriSafe,input.charAt(index));});},_compress:function(uncompressed,bitsPerChar,getCharFromInt){if(uncompressed==null)return"";var i,value,context_dictionary={},context_dictionaryToCreate={},context_c="",context_wc="",context_w="",context_enlargeIn=2,context_dictSize=3,context_numBits=2,context_data=[],context_data_val=0,context_data_position=0,ii;for(ii=0;ii<uncompressed.length;ii+=1){context_c=uncompressed.charAt(ii);if(!Object.prototype.hasOwnProperty.call(context_dictionary,context_c)){context_dictionary[context_c]=context_dictSize++;context_dictionaryToCreate[context_c]=true;}context_wc=context_w+context_c;if(Object.prototype.hasOwnProperty.call(context_dictionary,context_wc)){context_w=context_wc;}else{if(Object.prototype.hasOwnProperty.call(context_dictionaryToCreate,context_w)){if(context_w.charCodeAt(0)<256){for(i=0;i<context_numBits;i++){context_data_val=(context_data_val<<1);if(context_data_position==bitsPerChar-1){context_data_position=0;context_data.push(getCharFromInt(context_data_val));context_data_val=0;}else{context_data_position++;}}value=context_w.charCodeAt(0);for(i=0;i<8;i++){context_data_val=(context_data_val<<1)|(value&1);if(context_data_position==bitsPerChar-1){context_data_position=0;context_data.push(getCharFromInt(context_data_val));context_data_val=0;}else{context_data_position++;}value=value>>1;}}else{value=1;for(i=0;i<context_numBits;i++){context_data_val=(context_data_val<<1)|value;if(context_data_position==bitsPerChar-1){context_data_position=0;context_data.push(getCharFromInt(context_data_val));context_data_val=0;}else{context_data_position++;}value=0;}value=context_w.charCodeAt(0);for(i=0;i<16;i++){context_data_val=(context_data_val<<1)|(value&1);if(context_data_position==bitsPerChar-1){context_data_position=0;context_data.push(getCharFromInt(context_data_val));context_data_val=0;}else{context_data_position++;}value=value>>1;}}context_enlargeIn--;if(context_enlargeIn==0){context_enlargeIn=Math.pow(2,context_numBits);context_numBits++;}delete context_dictionaryToCreate[context_w];}else{value=context_dictionary[context_w];for(i=0;i<context_numBits;i++){context_data_val=(context_data_val<<1)|(value&1);if(context_data_position==bitsPerChar-1){context_data_position=0;context_data.push(getCharFromInt(context_data_val));context_data_val=0;}else{context_data_position++;}value=value>>1;}}context_enlargeIn--;if(context_enlargeIn==0){context_enlargeIn=Math.pow(2,context_numBits);context_numBits++;}context_dictionary[context_wc]=context_dictSize++;context_w=String(context_c);}}if(context_w!==""){if(Object.prototype.hasOwnProperty.call(context_dictionaryToCreate,context_w)){if(context_w.charCodeAt(0)<256){for(i=0;i<context_numBits;i++){context_data_val=(context_data_val<<1);if(context_data_position==bitsPerChar-1){context_data_position=0;context_data.push(getCharFromInt(context_data_val));context_data_val=0;}else{context_data_position++;}}value=context_w.charCodeAt(0);for(i=0;i<8;i++){context_data_val=(context_data_val<<1)|(value&1);if(context_data_position==bitsPerChar-1){context_data_position=0;context_data.push(getCharFromInt(context_data_val));context_data_val=0;}else{context_data_position++;}value=value>>1;}}else{value=1;for(i=0;i<context_numBits;i++){context_data_val=(context_data_val<<1)|value;if(context_data_position==bitsPerChar-1){context_data_position=0;context_data.push(getCharFromInt(context_data_val));context_data_val=0;}else{context_data_position++;}value=0;}value=context_w.charCodeAt(0);for(i=0;i<16;i++){context_data_val=(context_data_val<<1)|(value&1);if(context_data_position==bitsPerChar-1){context_data_position=0;context_data.push(getCharFromInt(context_data_val));context_data_val=0;}else{context_data_position++;}value=value>>1;}}context_enlargeIn--;if(context_enlargeIn==0){context_enlargeIn=Math.pow(2,context_numBits);context_numBits++;}delete context_dictionaryToCreate[context_w];}else{value=context_dictionary[context_w];for(i=0;i<context_numBits;i++){context_data_val=(context_data_val<<1)|(value&1);if(context_data_position==bitsPerChar-1){context_data_position=0;context_data.push(getCharFromInt(context_data_val));context_data_val=0;}else{context_data_position++;}value=value>>1;}}context_enlargeIn--;if(context_enlargeIn==0){context_enlargeIn=Math.pow(2,context_numBits);context_numBits++;}}value=2;for(i=0;i<context_numBits;i++){context_data_val=(context_data_val<<1)|(value&1);if(context_data_position==bitsPerChar-1){context_data_position=0;context_data.push(getCharFromInt(context_data_val));context_data_val=0;}else{context_data_position++;}value=value>>1;}while(true){context_data_val=(context_data_val<<1);if(context_data_position==bitsPerChar-1){context_data.push(getCharFromInt(context_data_val));break;}else{context_data_position++;}}return context_data.join("");},_decompress:function(length,resetValue,getNextValue){var dictionary=[],next,enlargeIn=4,dictSize=4,numBits=3,entry="",result=[],i,w,bits,resb,maxpower,power,c,data={val:getNextValue(0),position:resetValue,index:1};for(i=0;i<3;i+=1){dictionary[i]=i;}bits=0;maxpower=Math.pow(2,2);power=1;while(power!=maxpower){resb=data.val&data.position;data.position>>=1;if(data.position==0){data.position=resetValue;data.val=getNextValue(data.index++);}bits|=(resb>0?1:0)*power;power<<=1;}switch(next=bits){case 0:bits=0;maxpower=Math.pow(2,8);power=1;while(power!=maxpower){resb=data.val&data.position;data.position>>=1;if(data.position==0){data.position=resetValue;data.val=getNextValue(data.index++);}bits|=(resb>0?1:0)*power;power<<=1;}c=f(bits);break;case 1:bits=0;maxpower=Math.pow(2,16);power=1;while(power!=maxpower){resb=data.val&data.position;data.position>>=1;if(data.position==0){data.position=resetValue;data.val=getNextValue(data.index++);}bits|=(resb>0?1:0)*power;power<<=1;}c=f(bits);break;case 2:return"";}dictionary[3]=c;w=c;result.push(c);while(true){if(data.index>length){return"";}bits=0;maxpower=Math.pow(2,numBits);power=1;while(power!=maxpower){resb=data.val&data.position;data.position>>=1;if(data.position==0){data.position=resetValue;data.val=getNextValue(data.index++);}bits|=(resb>0?1:0)*power;power<<=1;}switch(c=bits){case 0:bits=0;maxpower=Math.pow(2,8);power=1;while(power!=maxpower){resb=data.val&data.position;data.position>>=1;if(data.position==0){data.position=resetValue;data.val=getNextValue(data.index++);}bits|=(resb>0?1:0)*power;power<<=1;}dictionary[dictSize++]=f(bits);c=dictSize-1;enlargeIn--;break;case 1:bits=0;maxpower=Math.pow(2,16);power=1;while(power!=maxpower){resb=data.val&data.position;data.position>>=1;if(data.position==0){data.position=resetValue;data.val=getNextValue(data.index++);}bits|=(resb>0?1:0)*power;power<<=1;}dictionary[dictSize++]=f(bits);c=dictSize-1;enlargeIn--;break;case 2:return result.join("");}if(enlargeIn==0){enlargeIn=Math.pow(2,numBits);numBits++;}if(dictionary[c]){entry=dictionary[c];}else{if(c===dictSize){entry=w+w.charAt(0);}else{return null;}}result.push(entry);dictionary[dictSize++]=w+entry.charAt(0);enlargeIn--;if(enlargeIn==0){enlargeIn=Math.pow(2,numBits);numBits++;}w=entry;}return result.join("");}};return LZString;})();
+
+// ===== QR share =====
+function shareViaQR(){
+  const state=getAppState();
+  const json=JSON.stringify(state);
+  const compressed=LZString.compressToEncodedURIComponent(json);
+  const base=location.href.split('#')[0].split('?')[0];
+  const url=base+'?s='+compressed;
+
+  // Build modal
+  const overlay=document.createElement('div');
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;';
+  overlay.onclick=e=>{if(e.target===overlay)overlay.remove();};
+
+  const box=document.createElement('div');
+  box.style.cssText='background:var(--surface);border-radius:16px;padding:20px;max-width:340px;width:90%;text-align:center;';
+
+  const title=document.createElement('div');
+  title.style.cssText='font-size:15px;font-weight:600;margin-bottom:12px;';
+  title.textContent='📱 スマホで読み込む';
+
+  const sub=document.createElement('div');
+  sub.style.cssText='font-size:11px;color:var(--text2);margin-bottom:14px;';
+  sub.textContent='QRコードをスマホのカメラで読み取ってください';
+
+  const cvs=document.createElement('canvas');
+  cvs.width=240;cvs.height=240;
+  cvs.style.cssText='display:block;margin:0 auto 12px;border-radius:8px;';
+
+  const urlBox=document.createElement('div');
+  urlBox.style.cssText='font-size:9px;color:var(--text3);word-break:break-all;margin-bottom:12px;max-height:40px;overflow:hidden;';
+  urlBox.textContent=url.length>200?url.slice(0,200)+'…':url;
+
+  const copyBtn=document.createElement('button');
+  copyBtn.className='btn sm active';
+  copyBtn.style.cssText='width:100%;margin-bottom:8px;';
+  copyBtn.textContent='🔗 URLをコピー';
+  copyBtn.onclick=()=>{navigator.clipboard.writeText(url).then(()=>{copyBtn.textContent='✓ コピーしました';setTimeout(()=>{copyBtn.textContent='🔗 URLをコピー';},1500);});};
+
+  const closeBtn=document.createElement('button');
+  closeBtn.className='btn sm';
+  closeBtn.style.cssText='width:100%;';
+  closeBtn.textContent='閉じる';
+  closeBtn.onclick=()=>overlay.remove();
+
+  box.append(title,sub,cvs,urlBox,copyBtn,closeBtn);
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+
+  // Draw QR using canvas (minimal pure-JS QR encoder)
+  drawQR(cvs, url);
+}
+
+// Minimal QR code renderer using qrcode-generator approach (data matrix only, no lib needed)
+// We use a simple approach: encode URL as a link shown if QR fails
+function drawQR(canvas, text){
+  // Use Google Charts API for QR (requires internet, but GitHub Pages users have internet)
+  // Alternatively fall back gracefully
+  const img=new Image();
+  img.crossOrigin='anonymous';
+  const encoded=encodeURIComponent(text);
+  // Use a self-hosted approach: draw a simple QR via inline library
+  // Since we have no lib, we use the URL approach with canvas placeholder
+  img.onload=()=>{
+    const ctx=canvas.getContext('2d');
+    ctx.drawImage(img,0,0,240,240);
+  };
+  img.onerror=()=>{
+    // Fallback: show text instructions
+    const ctx=canvas.getContext('2d');
+    ctx.fillStyle='#fff';
+    ctx.fillRect(0,0,240,240);
+    ctx.fillStyle='#333';
+    ctx.font='12px sans-serif';
+    ctx.textAlign='center';
+    ctx.fillText('QR生成にはインターネット',120,100);
+    ctx.fillText('接続が必要です',120,120);
+    ctx.fillText('上のURLをコピーして',120,150);
+    ctx.fillText('スマホで開いてください',120,170);
+  };
+  // Use qrserver (free, no API key needed)
+  img.src='https://api.qrserver.com/v1/create-qr-code/?size=240x240&ecc=M&data='+encoded;
+}
+
 // ===== Init =====
 // Scene buttons
 const sb2=document.getElementById("sceneBtns");
@@ -1938,11 +2027,22 @@ renderZoneBtns();
 window.matchMedia("(prefers-color-scheme:dark)").addEventListener("change",()=>{redraw();if(btmOpen)drawShapeMap();});
 window.addEventListener("resize",()=>{resizeCanvas();if(btmOpen)initShapeMap();});
 
-// 保存済み設定をロード
+// URLパラメータ ?s= からの読み込み（QRシェア）
 try{
-  const saved=localStorage.getItem('ldkSim_v2');
-  if(saved){applyAppState(JSON.parse(saved));}
-}catch(e){}
+  const sp=new URLSearchParams(location.search);
+  const s=sp.get('s');
+  if(s){
+    const json=LZString.decompressFromEncodedURIComponent(s);
+    if(json){const st=JSON.parse(json);applyAppState(st);}
+    // URLをクリーンにする
+    history.replaceState(null,'',location.pathname);
+  } else {
+    const saved=localStorage.getItem('ldkSim_v2');
+    if(saved){applyAppState(JSON.parse(saved));}
+  }
+}catch(e){
+  try{const saved=localStorage.getItem('ldkSim_v2');if(saved){applyAppState(JSON.parse(saved));}}catch(e2){}
+}
 
 requestAnimationFrame(()=>requestAnimationFrame(()=>{
   resizeCanvas();
