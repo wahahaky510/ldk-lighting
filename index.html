@@ -1034,15 +1034,18 @@ function redraw(){
       gr.addColorStop(1,"transparent");
       ctx.fillStyle=gr;ctx.beginPath();ctx.arc(cx,cy,glowR,0,Math.PI*2);ctx.fill();
     }
-    ctx.beginPath();ctx.arc(cx,cy,8,0,Math.PI*2);
+    const{scale:sc}=getMS();
+    const dotR=Math.max(5,Math.min(14,sc*0.15)); // 物理15cm固定、最小5px最大14px
+    const xOff=dotR+2;
+    ctx.beginPath();ctx.arc(cx,cy,dotR,0,Math.PI*2);
     const dotColor=!fixtureOn?(dk?"#555":"#aaa"):on?(dk?"#ffd878":"#e8a020"):(dk?"#444":"#ccc");
     ctx.fillStyle=dotColor;ctx.fill();
-    if(!fixtureOn){ctx.strokeStyle="rgba(200,80,80,0.7)";ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(cx-5,cy-5);ctx.lineTo(cx+5,cy+5);ctx.stroke();}
+    if(!fixtureOn){ctx.strokeStyle="rgba(200,80,80,0.7)";ctx.lineWidth=1.5;const xr=dotR*.6;ctx.beginPath();ctx.moveTo(cx-xr,cy-xr);ctx.lineTo(cx+xr,cy+xr);ctx.stroke();}
     ctx.strokeStyle=isSel?"#2563eb":hexToRgba(z.color,0.6);ctx.lineWidth=isSel?2.5:1.5;ctx.stroke();
     ctx.fillStyle=dk?"rgba(200,215,245,0.85)":"rgba(40,50,100,0.8)";
     ctx.font="10px monospace";
-    ctx.fillText(f.label,cx+10,cy-3);
-    if(f.model){ctx.fillStyle=dk?"rgba(120,160,255,0.6)":"rgba(30,60,180,0.55)";ctx.fillText(f.model,cx+10,cy+9);}
+    ctx.fillText(f.label,cx+xOff,cy-3);
+    if(f.model){ctx.fillStyle=dk?"rgba(120,160,255,0.6)":"rgba(30,60,180,0.55)";ctx.fillText(f.model,cx+xOff,cy+9);}
   });
 
   // ゾーン辺ハンドル（照明の上に重ならないよう最後）
@@ -1054,7 +1057,8 @@ function redraw(){
       const midX=(rx1+rx2)/2,midY=(ry1+ry2)/2;
       [{x:rx1,y:midY},{x:rx2,y:midY},{x:midX,y:ry1},{x:midX,y:ry2}].forEach(h=>{
         if(!isInside(Math.max(0.01,Math.min(shape.w-0.01,h.x)),Math.max(0.01,Math.min(shape.h-0.01,h.y))))return;
-        ctx.beginPath();ctx.arc(tx(h.x),ty(h.y),7,0,Math.PI*2);
+        const{scale:scZ}=getMS();const zHandleR=Math.max(5,Math.min(10,scZ*0.12));
+        ctx.beginPath();ctx.arc(tx(h.x),ty(h.y),zHandleR,0,Math.PI*2);
         ctx.fillStyle="rgba(255,255,255,0.2)";ctx.fill();
         ctx.strokeStyle=hexToRgba(z.color,0.8);ctx.lineWidth=1.5;ctx.stroke();
       });
@@ -1095,7 +1099,7 @@ function mainDown(e){
 
   // Zone rect edge hit (addMode/addFurMode 中は無効)
   if(!addMode&&!addFurMode){
-    const HIT=14;
+    const{scale:scH}=getMS();const HIT=Math.max(10,Math.min(20,scH*0.18));
     for(const z of zones){
       if(!z.rect)continue;
       const rx1=z.rect.x1*shape.w,ry1=z.rect.y1*shape.h;
@@ -1117,7 +1121,8 @@ function mainDown(e){
   for(let i=fixtures.length-1;i>=0;i--){
     const f=fixtures[i];
     const{cx,cy}=toC(f.x,f.y);
-    if(Math.hypot(mx-cx,my-cy)<14){
+    const{scale:scF}=getMS();const fHIT=Math.max(10,Math.min(20,scF*0.18));
+    if(Math.hypot(mx-cx,my-cy)<fHIT){
       selectedId=f.id;selectedFId=null;
       dragging={id:f.id,ox:mx-cx,oy:my-cy};
       updateSelPanel();redraw();return;
