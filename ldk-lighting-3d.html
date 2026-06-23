@@ -596,42 +596,84 @@ function buildFixtures() {
     const iesSpot = iesAngle != null && iesAngle < 1.0;
     const recessed = f.iesData ? iesSpot : presetRecessed;
 
-    // 露出光源（ペンダント・スタンド等）のみ発光球を描く。埋込型は球を出さない
+    // 器具種別
+    const isFloorLamp = (f.presetId === 'floor_stand' || f.presetId === 'floor_indirect');
+    const isBracket = (f.presetId === 'bracket');
+    const isPendant = (f.presetId === 'pendant' || f.presetId === 'ph5');
+    // 光源（点光源）の水平オフセット。ブラケットは壁面側へずらす
+    let lampOX = 0, lampOZ = 0;
+
+    const mkBodyMat = () => new THREE.MeshStandardMaterial({
+      color: effectiveOn ? 0xffe8a0 : 0x404048,
+      emissive: effectiveOn ? 0xffcc50 : 0x000000,
+      emissiveIntensity: effectiveOn ? Math.min(3, dimLv * 2.5) : 0,
+      roughness: 0.3, metalness: 0.15
+    });
+
     if(!recessed) {
-      const bodyR = f.presetId === 'ceiling' ? 0.18 : 0.06;
-      const bodyGeo = new THREE.SphereGeometry(bodyR, 12, 8);
-      const bodyMat = new THREE.MeshStandardMaterial({
-        color: effectiveOn ? 0xffe8a0 : 0x404048,
-        emissive: effectiveOn ? 0xffcc50 : 0x000000,
-        emissiveIntensity: effectiveOn ? Math.min(3, dimLv * 2.5) : 0,
-        roughness: 0.3, metalness: 0.15
-      });
-      const body = new THREE.Mesh(bodyGeo, bodyMat);
-      body.position.y = fxH;
-      g.add(body);
-    }
-
-    // Cord for pendants and floor lamps
-    if(p.defaultHeight && fxH < CEIL_H - 0.15) {
-      const cordLen = CEIL_H - fxH;
-      const cord = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.006, 0.006, cordLen, 4),
-        new THREE.MeshBasicMaterial({color: 0x303038})
-      );
-      cord.position.y = fxH + cordLen / 2;
-      g.add(cord);
-
-      // Shade for PH5-style pendant
-      if(f.presetId === 'ph5') {
-        const shadeGeo = new THREE.ConeGeometry(0.28, 0.14, 20, 1, true);
-        const shadeMat = new THREE.MeshStandardMaterial({color:0xc0a060, roughness:0.4, metalness:0.3, side:THREE.DoubleSide});
-        const shade = new THREE.Mesh(shadeGeo, shadeMat);
-        shade.position.y = fxH - 0.06;
+      if(isFloorLamp) {
+        // 置き型：床から支柱＋台座、上端に本体（天井コードなし）
+        const base = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.16, 0.18, 0.03, 20),
+          new THREE.MeshStandardMaterial({color:0x2a2a30, roughness:0.6, metalness:0.4})
+        );
+        base.position.y = 0.015; g.add(base);
+        const pole = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.018, 0.018, fxH, 8),
+          new THREE.MeshStandardMaterial({color:0x3a3a42, roughness:0.5, metalness:0.5})
+        );
+        pole.position.y = fxH / 2; g.add(pole);
+        // シェード（フロアスタンドは下向き笠、間接は上向き笠）
+        const shadeMat = new THREE.MeshStandardMaterial({color:0xc9b48a, roughness:0.6, metalness:0.1, side:THREE.DoubleSide});
+        const shade = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.22, 22, 1, true), shadeMat);
+        shade.position.y = fxH + 0.02;
+        if(f.presetId === 'floor_indirect') shade.rotation.x = Math.PI; // 上向き
         g.add(shade);
-        // Inner shade
-        const shade2 = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.09, 20, 1, true), shadeMat.clone());
-        shade2.position.y = fxH + 0.04;
-        g.add(shade2);
+        const body = new THREE.Mesh(new THREE.SphereGeometry(0.05, 12, 8), mkBodyMat());
+        body.position.y = fxH; g.add(body);
+      } else if(isBracket) {
+        // 壁付け：最寄り壁にバックプレート＋アーム＋本体（天井コードなし）
+        const nw = nearestWall(f.x, f.y);
+        const arm = 0.1;
+        // 壁面上のローカル座標（g原点=器具位置からの相対）
+        const wallLX = -nw.dist * nw.nx, wallLZ = -nw.dist * nw.nz;
+        lampOX = wallLX + arm * nw.nx; lampOZ = wallLZ + arm * nw.nz;
+        const plate = new THREE.Mesh(
+          new THREE.BoxGeometry(0.16, 0.16, 0.03),
+          new THREE.MeshStandardMaterial({color:0x3a3a42, roughness:0.5, metalness:0.4})
+        );
+        plate.position.set(wallLX, fxH, wallLZ);
+        plate.rotation.y = nw.rotY; g.add(plate);
+        const armMesh = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.012, 0.012, arm, 6),
+          new THREE.MeshStandardMaterial({color:0x3a3a42, roughness:0.5, metalness:0.5})
+        );
+        armMesh.position.set(wallLX + arm/2 * nw.nx, fxH, wallLZ + arm/2 * nw.nz);
+        armMesh.rotation.z = Math.PI / 2; armMesh.rotation.y = -nw.rotY; g.add(armMesh);
+        const body = new THREE.Mesh(new THREE.SphereGeometry(0.06, 12, 8), mkBodyMat());
+        body.position.set(lampOX, fxH, lampOZ); g.add(body);
+      } else {
+        // ペンダント・天井直付など：本体＋天井からのコード
+        const bodyR = f.presetId === 'ceiling' ? 0.18 : 0.06;
+        const body = new THREE.Mesh(new THREE.SphereGeometry(bodyR, 12, 8), mkBodyMat());
+        body.position.y = fxH; g.add(body);
+
+        if(p.defaultHeight && fxH < CEIL_H - 0.15) {
+          const cordLen = CEIL_H - fxH;
+          const cord = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.006, 0.006, cordLen, 4),
+            new THREE.MeshBasicMaterial({color: 0x303038})
+          );
+          cord.position.y = fxH + cordLen / 2; g.add(cord);
+
+          if(f.presetId === 'ph5') {
+            const shadeMat = new THREE.MeshStandardMaterial({color:0xc0a060, roughness:0.4, metalness:0.3, side:THREE.DoubleSide});
+            const shade = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.14, 20, 1, true), shadeMat);
+            shade.position.y = fxH - 0.06; g.add(shade);
+            const shade2 = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.09, 20, 1, true), shadeMat.clone());
+            shade2.position.y = fxH + 0.04; g.add(shade2);
+          }
+        }
       }
     }
 
@@ -691,10 +733,10 @@ function buildFixtures() {
         // 影マップは付けない（多灯でのテクスチャユニット超過・性能低下を回避）。
         // 家具の接地はコンタクトシャドウで表現。
       } else {
-        // 露出光源（ペンダント/スタンド）：全方向
+        // 露出光源（ペンダント/スタンド/ブラケット）：全方向
         const lightY = f.presetId === 'floor_indirect' ? fxH + 0.1 : fxH - 0.08;
         const ptLight = new THREE.PointLight(0xffd888, lm / 210, 9, 2);
-        ptLight.position.y = lightY;
+        ptLight.position.set(lampOX, lightY, lampOZ);
         ptLight.castShadow = lm > 800;
         if(ptLight.castShadow) {
           ptLight.shadow.mapSize.set(512, 512);
@@ -717,6 +759,18 @@ function buildFixtures() {
 
   scene.add(fxGroup);
   groups.fx = fxGroup;
+}
+
+// 最寄り壁を求める（ブラケットの壁付け用）。内向き法線と符号付き距離を返す
+function nearestWall(fx, fy) {
+  const defs = getWallDefs(S.orient, S.w, S.h, S.nx, S.ny);
+  let best = null, bestAbs = Infinity;
+  defs.forEach(d => {
+    const nx = Math.sin(d.rotY), nz = Math.cos(d.rotY);   // 内向き法線
+    const dist = (fx - d.x) * nx + (fy - d.z) * nz;        // 壁面までの符号付き距離
+    if(Math.abs(dist) < bestAbs) { bestAbs = Math.abs(dist); best = {nx, nz, dist, rotY: d.rotY}; }
+  });
+  return best;
 }
 
 // IES配光から半値角（強度がピークの50%に落ちる角度）を求める。3Dスポットの配光角に使用
