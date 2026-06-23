@@ -580,7 +580,11 @@ function buildFixtures() {
     g.position.set(f.x, 0, f.y);
 
     // 埋込ダウンライト系（光源が見えずスポット状に照らす器具）
-    const recessed = ['dl_s','dl_m','dl_l','spot','gl_30','gl_50','sgl_30','sgl_50'].includes(f.presetId);
+    const presetRecessed = ['dl_s','dl_m','dl_l','spot','gl_30','gl_50','sgl_30','sgl_50'].includes(f.presetId);
+    // IES読込時はその配光から半値角を算出し、狭ければスポット扱い（埋込・光源非表示）
+    const iesAngle = f.iesData ? iesBeamHalfAngle(f.iesData) : null;
+    const iesSpot = iesAngle != null && iesAngle < 1.0;
+    const recessed = f.iesData ? iesSpot : presetRecessed;
 
     // 露出光源（ペンダント・スタンド等）のみ発光球を描く。埋込型は球を出さない
     if(!recessed) {
@@ -661,11 +665,14 @@ function buildFixtures() {
     };
 
     if(effectiveOn) {
-      const lm = p.lm * dimLv;
-      const useSpot = recessed || f.presetId === 'ceiling';
+      const lm = (f.iesData ? f.iesData.lumens : p.lm) * dimLv;
+      const useSpot = f.iesData ? iesSpot : (recessed || f.presetId === 'ceiling');
       if(useSpot) {
         // 下向きスポット：床・壁・家具にシャープな光だまり（グレアレスの見え方）
-        const sp = SPOT[f.presetId] || {ang:0.6, pen:0.5};
+        // IESがあれば実配光の半値角を、なければプリセットのビーム角を使用
+        const sp = f.iesData
+          ? {ang: Math.min(1.4, Math.max(0.12, iesAngle * 1.15)), pen: 0.3}
+          : (SPOT[f.presetId] || {ang:0.6, pen:0.5});
         const spot = new THREE.SpotLight(0xffd9a0, lm / 70, fxH + 1.6, sp.ang, sp.pen, 2);
         spot.position.set(0, fxH - 0.02, 0);
         spot.target.position.set(0, 0, 0);
@@ -700,6 +707,21 @@ function buildFixtures() {
 
   scene.add(fxGroup);
   groups.fx = fxGroup;
+}
+
+// IES配光から半値角（強度がピークの50%に落ちる角度）を求める。3Dスポットの配光角に使用
+function iesBeamHalfAngle(ies) {
+  const va = ies.vAngles, cd = ies.candela;
+  const prof = va.map((_, vi) => {
+    let s = 0; for(let h = 0; h < cd.length; h++) s += cd[h][vi];
+    return s / cd.length;
+  });
+  const peak = Math.max(...prof);
+  if(peak <= 0) return 0.6;
+  for(let vi = 0; vi < va.length; vi++) {
+    if(prof[vi] <= 0.5 * peak) return Math.max(0.12, va[vi] * Math.PI / 180);
+  }
+  return Math.max(...va) * Math.PI / 180;
 }
 
 // 接地影用の放射状グラデーションテクスチャ（一度だけ生成しキャッシュ）
@@ -873,6 +895,7 @@ window.loadIES = (id) => {
       try {
         f.iesData = parseIES(ev.target.result);
         buildFxUI();
+        buildFixtures();   // 3DライトにもIES配光を反映
         rebuildHeatmap();
         updateStats();
       } catch(err) {
