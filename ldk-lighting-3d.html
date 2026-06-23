@@ -243,6 +243,45 @@ function isInsideRoom(rx, ry) {
   return true;
 }
 
+// 配光カーブの形状 g(θ)（θ=直下からの角度, deg）。値は相対強度。
+function beamShape(bt, vDeg) {
+  const v = vDeg * Math.PI / 180;
+  const cv = Math.max(0, Math.cos(v));
+  switch(bt) {
+    case 'glare_narrow':    return Math.exp(-Math.pow(vDeg / 16, 2));  // グレアレス狭角
+    case 'glare_wide':      return Math.exp(-Math.pow(vDeg / 27, 2));  // グレアレス広角
+    case 'soft_glare':      return Math.pow(cv, 4);                    // 拡散グレアレス狭
+    case 'soft_glare_wide': return Math.pow(cv, 2);                    // 拡散グレアレス広
+    case 'pendant_focused': return Math.exp(-Math.pow(vDeg / 48, 2));  // PH5系・下方集光
+    default:                return cv;                                 // 一般DL（ランバート）
+  }
+}
+
+// プリセットを光束保存の合成IES配光テーブルに変換（マジック係数なしの物理計算用）
+function generateSyntheticIES(p) {
+  const bt = p.beamType || 'cosine';
+  const vAngles = [];
+  const shape = [];
+  for(let d = 0; d <= 90; d += 2) { vAngles.push(d); shape.push(beamShape(bt, d)); }
+  // 下半球の光束 Φ = ∫ g(θ)·2π·sinθ dθ を台形積分し、Φ=lm になるよう正規化
+  let flux = 0;
+  for(let i = 0; i < vAngles.length - 1; i++) {
+    const t1 = vAngles[i] * Math.PI / 180, t2 = vAngles[i + 1] * Math.PI / 180;
+    const g1 = shape[i] * Math.sin(t1), g2 = shape[i + 1] * Math.sin(t2);
+    flux += 2 * Math.PI * (g1 + g2) / 2 * (t2 - t1);
+  }
+  const scale = flux > 0 ? p.lm / flux : 0;
+  const candela = [shape.map(g => g * scale)];
+  return { lumens: p.lm, watts: p.w, vAngles, hAngles: [0], candela, upwardFraction: 0 };
+}
+
+// 器具の配光データを取得（実IES優先、なければプリセットから合成してキャッシュ）
+function getDistribution(f, p) {
+  if(f.iesData) return f.iesData;
+  if(!p._synthIES) p._synthIES = generateSyntheticIES(p);
+  return p._synthIES;
+}
+
 function calcLux(rx, ry) {
   let lux = 0;
   fixtures.forEach(f => {
@@ -256,54 +295,13 @@ function calcLux(rx, ry) {
     const dx = rx - f.x, dy = ry - f.y;
     const dist3d = Math.sqrt(dx*dx + dy*dy + fh*fh);
     const cosTheta = fh / dist3d;
-    const wb = p.warmBias || 1.0;
-    let contrib = 0;
 
-    if(f.iesData) {
-      const thetaDeg = Math.acos(Math.min(1, cosTheta)) * 180 / Math.PI;
-      const phiDeg = Math.abs(Math.atan2(dy, dx) * 180 / Math.PI);
-      const cd = interpolateIES(f.iesData, thetaDeg, phiDeg);
-      contrib = cd * cosTheta / (dist3d * dist3d);
-      lux += contrib * dimLv;
-      return;
-    }
-
-    const bt = p.beamType || 'cosine';
-    if(bt === 'glare_narrow') {
-      const halfRad = 15 * Math.PI / 180;
-      if(cosTheta > Math.cos(halfRad * 1.5)) {
-        const theta = Math.acos(Math.min(1, cosTheta));
-        const bf = Math.exp(-Math.pow(theta / halfRad, 2.5) * 2.8);
-        contrib = (p.lm * bf * cosTheta) / (Math.PI * dist3d * dist3d) * 55;
-      }
-    } else if(bt === 'glare_wide') {
-      const halfRad = 25 * Math.PI / 180;
-      if(cosTheta > Math.cos(halfRad * 1.4)) {
-        const theta = Math.acos(Math.min(1, cosTheta));
-        const bf = Math.exp(-Math.pow(theta / halfRad, 2.2) * 2.0);
-        contrib = (p.lm * bf * cosTheta) / (Math.PI * dist3d * dist3d) * 38;
-      }
-    } else if(bt === 'soft_glare') {
-      const halfRad = 16 * Math.PI / 180;
-      const theta = Math.acos(Math.min(1, cosTheta));
-      const bf = Math.pow(Math.max(0, 1 - theta / (halfRad * 1.6)), 2.0);
-      contrib = (p.lm * bf * cosTheta) / (Math.PI * dist3d * dist3d) * 52;
-    } else if(bt === 'soft_glare_wide') {
-      const halfRad = 26 * Math.PI / 180;
-      const theta = Math.acos(Math.min(1, cosTheta));
-      const bf = Math.pow(Math.max(0, 1 - theta / (halfRad * 1.5)), 1.8);
-      contrib = (p.lm * bf * cosTheta) / (Math.PI * dist3d * dist3d) * 36;
-    } else if(bt === 'pendant_focused') {
-      const halfRad = 42 * Math.PI / 180;
-      const theta = Math.acos(Math.min(1, cosTheta));
-      if(theta < halfRad * 1.6) {
-        const bf = Math.pow(Math.max(0, 1 - theta / halfRad), 3.0);
-        contrib = (p.lm * bf * fh) / (Math.PI * Math.pow(dist3d, 3)) * 70;
-      }
-    } else {
-      contrib = p.lm * wb * fh / (Math.PI * Math.pow(dist3d, 3)) * 42;
-    }
-    lux += contrib * wb * dimLv;
+    // 全器具を物理式 E = I(θ)·cosθ / d² で統一（IESまたは合成配光テーブル）
+    const dist = getDistribution(f, p);
+    const thetaDeg = Math.acos(Math.min(1, cosTheta)) * 180 / Math.PI;
+    const phiDeg = Math.abs(Math.atan2(dy, dx) * 180 / Math.PI);
+    const cd = interpolateIES(dist, thetaDeg, phiDeg);
+    lux += cd * cosTheta / (dist3d * dist3d) * dimLv;
   });
   return lux;
 }
