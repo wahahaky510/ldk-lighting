@@ -44,6 +44,11 @@ html,body{width:100%;height:100%;overflow:hidden;background:#08080d;font-family:
 .fxdim::-webkit-slider-thumb{-webkit-appearance:none;width:10px;height:10px;border-radius:50%;background:#f59e0b;cursor:pointer}
 .iesbtn{font-size:9px;padding:2px 5px;border:1px solid rgba(255,255,255,.2);border-radius:4px;background:rgba(255,255,255,.06);color:#7070a0;cursor:pointer;flex-shrink:0;white-space:nowrap}
 .iesbtn:hover{border-color:rgba(255,255,255,.4);color:#c0c0e0}
+.rrow{display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.04)}
+.rlbl{font-size:11px;color:#9090b8;width:26px;flex-shrink:0}
+.rrow input[type=range]{-webkit-appearance:none;appearance:none;flex:1;height:3px;border-radius:2px;background:rgba(255,255,255,.15);cursor:pointer;outline:none}
+.rrow input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:11px;height:11px;border-radius:50%;background:#6f9ad8;cursor:pointer}
+.rval{font-size:10px;color:#8a8ab0;width:30px;text-align:right;flex-shrink:0}
 
 /* Stats */
 .sgrid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:4px}
@@ -94,6 +99,12 @@ html,body{width:100%;height:100%;overflow:hidden;background:#08080d;font-family:
     <div class="sec">照明器具</div>
     <div id="fxList"></div>
 
+    <div class="sec">反射率（間接光）</div>
+    <div class="rrow"><span class="rlbl">床</span><input type="range" id="rFloor" min="0" max="0.9" step="0.05" value="0.2" oninput="setReflect()"><span class="rval" id="rFloorV">0.20</span></div>
+    <div class="rrow"><span class="rlbl">壁</span><input type="range" id="rWall" min="0" max="0.9" step="0.05" value="0.5" oninput="setReflect()"><span class="rval" id="rWallV">0.50</span></div>
+    <div class="rrow"><span class="rlbl">天井</span><input type="range" id="rCeil" min="0" max="0.9" step="0.05" value="0.7" oninput="setReflect()"><span class="rval" id="rCeilV">0.70</span></div>
+    <div class="rrow" style="border:none"><span class="rlbl" style="color:#7080a0">間接</span><span class="rval" id="indV" style="flex:1;text-align:right;color:#9aa8c8">— lx</span></div>
+
     <div class="sec">照度統計（床面）</div>
     <div class="sgrid">
       <div class="sbox"><div class="slbl">平均照度</div><div class="sval"><span id="sAvg">—</span><span class="sunit"> lx</span></div></div>
@@ -139,8 +150,26 @@ const PRESETS = {
   sgl_50:        {lm:750,  w:9,  beamType:'soft_glare_wide'},
 };
 
-// Room (orient=2: top-left notch)
-let S = {w:6.37, h:9.1, nx:4.78, ny:5.46, orient:2};
+// Room (orient=2: top-left notch)。rho* は面の反射率（間接光計算用）
+let S = {w:6.37, h:9.1, nx:4.78, ny:5.46, orient:2, rhoFloor:0.2, rhoWall:0.5, rhoCeil:0.7};
+
+// 室内相互反射による間接照度（積分球近似）。recomputeIndirect() で更新
+let indirectLux = 0;
+function recomputeIndirect() {
+  const floorA = S.w * S.h - S.nx * S.ny;     // L字床面積
+  const ceilA = floorA;
+  const wallA = 2 * (S.w + S.h) * CEIL_H;      // L字でも外周は矩形と同じ
+  const Atot = floorA + ceilA + wallA;
+  const rhoAvg = (S.rhoFloor * floorA + S.rhoWall * wallA + S.rhoCeil * ceilA) / Atot;
+  let flux = 0;
+  fixtures.forEach(f => {
+    if(f.enabled === false) return;
+    const p = PRESETS[f.presetId]; if(!p) return;
+    const lm = f.iesData ? f.iesData.lumens : p.lm;
+    flux += lm * (f.dimLevel ?? 1.0);
+  });
+  indirectLux = rhoAvg < 1 ? flux * rhoAvg / (Atot * (1 - rhoAvg)) : 0;
+}
 
 let fixtures = [
   {id:30, presetId:'bracket',      x:2.912, y:9.069, label:'K-1', height:1.5,  enabled:true, dimLevel:0.58},
@@ -303,7 +332,7 @@ function calcLux(rx, ry) {
     const cd = interpolateIES(dist, thetaDeg, phiDeg);
     lux += cd * cosTheta / (dist3d * dist3d) * dimLv;
   });
-  return lux;
+  return lux + indirectLux;  // 直接光 + 室内相互反射（間接光）
 }
 
 function luxToRGB(lux) {
@@ -329,6 +358,7 @@ function luxToRGB(lux) {
 }
 
 function generateHeatmap() {
+  recomputeIndirect();
   const W = 512, H = 512;
   const cvs = document.createElement('canvas');
   cvs.width = W; cvs.height = H;
@@ -371,6 +401,7 @@ controls.maxPolarAngle = Math.PI * 0.98;
 
 // Scene object groups for layer toggling
 const groups = {heat: null, ceil: null, fur: null, fx: null, grid: null};
+let hemiLight = null;
 
 // ===== L-Shape geometry builder =====
 function makeLShape(orient, w, h, nx, ny) {
@@ -439,8 +470,19 @@ function buildRoom() {
     scene.add(mesh);
   });
 
-  // Ambient + dim fill
-  scene.add(new THREE.AmbientLight(0x180e08, 0.4));
+  // 間接光：床↔天井の半球光で室内相互反射を表現（強度は recomputeIndirect 連動）
+  hemiLight = new THREE.HemisphereLight(0xfff0e0, 0x2a1c10, 0.0);
+  hemiLight.position.set(w / 2, CEIL_H, h / 2);
+  scene.add(hemiLight);
+  scene.add(new THREE.AmbientLight(0x180e08, 0.25));
+  updateIndirectLighting();
+}
+
+// 間接照度を3Dの半球光の強度に反映（視覚的なリアル化）
+function updateIndirectLighting() {
+  if(!hemiLight) return;
+  recomputeIndirect();
+  hemiLight.intensity = Math.min(1.1, indirectLux / 130);
 }
 
 function getWallDefs(orient, w, h, nx, ny) {
@@ -664,6 +706,7 @@ function rebuild() {
 
 // ===== Stats =====
 function updateStats() {
+  recomputeIndirect();
   const N = 60;
   let sum = 0, cnt = 0, max = 0;
   for(let i = 0; i < N; i++) for(let j = 0; j < N; j++) {
@@ -674,6 +717,8 @@ function updateStats() {
   }
   document.getElementById('sAvg').textContent = cnt ? Math.round(sum / cnt) : '—';
   document.getElementById('sMax').textContent = Math.round(max);
+  const iv = document.getElementById('indV');
+  if(iv) iv.textContent = Math.round(indirectLux) + ' lx';
 }
 
 // ===== Fixture UI =====
@@ -699,6 +744,17 @@ function buildFxUI() {
   });
 }
 
+window.setReflect = () => {
+  S.rhoFloor = parseFloat(document.getElementById('rFloor').value);
+  S.rhoWall  = parseFloat(document.getElementById('rWall').value);
+  S.rhoCeil  = parseFloat(document.getElementById('rCeil').value);
+  document.getElementById('rFloorV').textContent = S.rhoFloor.toFixed(2);
+  document.getElementById('rWallV').textContent  = S.rhoWall.toFixed(2);
+  document.getElementById('rCeilV').textContent  = S.rhoCeil.toFixed(2);
+  rebuildHeatmap();
+  updateStats();
+};
+
 window.loadIES = (id) => {
   const f = fixtures.find(x => x.id === id); if(!f) return;
   const inp = document.createElement('input');
@@ -723,6 +779,7 @@ window.loadIES = (id) => {
 
 function rebuildHeatmap() {
   if(!groups.heat) return;
+  updateIndirectLighting();
   scene.remove(groups.heat);
   const geo = new THREE.ShapeGeometry(makeLShape(S.orient, S.w, S.h, S.nx, S.ny), 2);
   geo.rotateX(Math.PI / 2);
