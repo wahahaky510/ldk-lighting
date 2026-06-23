@@ -471,6 +471,7 @@ function buildRoom() {
   baseGeo.rotateX(Math.PI / 2);
   mats.base = new THREE.MeshStandardMaterial({color:0x0c0805, roughness:0.95, metalness:0, side:THREE.DoubleSide});
   const baseMesh = new THREE.Mesh(baseGeo, mats.base);
+  baseMesh.receiveShadow = true;
   scene.add(baseMesh);
   scene.add(heatGroup);
   groups.heat = heatGroup;
@@ -578,18 +579,23 @@ function buildFixtures() {
     const g = new THREE.Group();
     g.position.set(f.x, 0, f.y);
 
-    // Fixture body sphere
-    const bodyR = f.presetId === 'ceiling' ? 0.18 : 0.06;
-    const bodyGeo = new THREE.SphereGeometry(bodyR, 12, 8);
-    const bodyMat = new THREE.MeshStandardMaterial({
-      color: effectiveOn ? 0xffe8a0 : 0x404048,
-      emissive: effectiveOn ? 0xffcc50 : 0x000000,
-      emissiveIntensity: effectiveOn ? Math.min(3, dimLv * 2.5) : 0,
-      roughness: 0.3, metalness: 0.15
-    });
-    const body = new THREE.Mesh(bodyGeo, bodyMat);
-    body.position.y = fxH;
-    g.add(body);
+    // 埋込ダウンライト系（光源が見えずスポット状に照らす器具）
+    const recessed = ['dl_s','dl_m','dl_l','spot','gl_30','gl_50','sgl_30','sgl_50'].includes(f.presetId);
+
+    // 露出光源（ペンダント・スタンド等）のみ発光球を描く。埋込型は球を出さない
+    if(!recessed) {
+      const bodyR = f.presetId === 'ceiling' ? 0.18 : 0.06;
+      const bodyGeo = new THREE.SphereGeometry(bodyR, 12, 8);
+      const bodyMat = new THREE.MeshStandardMaterial({
+        color: effectiveOn ? 0xffe8a0 : 0x404048,
+        emissive: effectiveOn ? 0xffcc50 : 0x000000,
+        emissiveIntensity: effectiveOn ? Math.min(3, dimLv * 2.5) : 0,
+        roughness: 0.3, metalness: 0.15
+      });
+      const body = new THREE.Mesh(bodyGeo, bodyMat);
+      body.position.y = fxH;
+      g.add(body);
+    }
 
     // Cord for pendants and floor lamps
     if(p.defaultHeight && fxH < CEIL_H - 0.15) {
@@ -615,37 +621,77 @@ function buildFixtures() {
       }
     }
 
-    // Ceiling mount disc for ceiling/DL
+    // 天井取付の見た目
     if(fxH >= CEIL_H - 0.05) {
-      const discR = f.presetId === 'ceiling' ? 0.22 : 0.055;
-      const disc = new THREE.Mesh(
-        new THREE.CylinderGeometry(discR, discR, 0.02, 16),
-        new THREE.MeshStandardMaterial({color: 0xd0c8bc, roughness:0.6, metalness:0.1})
-      );
-      disc.position.y = CEIL_H;
-      g.add(disc);
+      if(recessed) {
+        // グレアレス：天井ツライチの暗いアパーチャ（光源は見えない）
+        const apR = 0.05;
+        const ring = new THREE.Mesh(
+          new THREE.CylinderGeometry(apR + 0.012, apR + 0.012, 0.012, 20),
+          new THREE.MeshStandardMaterial({color: 0xb8b0a4, roughness:0.5, metalness:0.2})
+        );
+        ring.position.y = CEIL_H - 0.006;
+        g.add(ring);
+        // 奥まった暗い開口（点灯時もごく僅かに光る程度）
+        const aperture = new THREE.Mesh(
+          new THREE.CircleGeometry(apR, 20),
+          new THREE.MeshBasicMaterial({color: effectiveOn ? 0x4a3a20 : 0x101010})
+        );
+        aperture.rotation.x = Math.PI / 2;
+        aperture.position.y = CEIL_H - 0.02;
+        g.add(aperture);
+      } else {
+        const discR = f.presetId === 'ceiling' ? 0.22 : 0.055;
+        const disc = new THREE.Mesh(
+          new THREE.CylinderGeometry(discR, discR, 0.02, 16),
+          new THREE.MeshStandardMaterial({color: 0xd0c8bc, roughness:0.6, metalness:0.1})
+        );
+        disc.position.y = CEIL_H;
+        g.add(disc);
+      }
     }
 
-    // Point light
+    // 配光角（ビームタイプ → スポットライトのコーン半角）
+    const SPOT = {
+      gl_30:{ang:0.34, pen:0.25}, gl_50:{ang:0.52, pen:0.35},
+      sgl_30:{ang:0.42, pen:0.55}, sgl_50:{ang:0.60, pen:0.6},
+      spot:{ang:0.40, pen:0.35}, dl_s:{ang:0.62, pen:0.5},
+      dl_m:{ang:0.62, pen:0.5}, dl_l:{ang:0.66, pen:0.5},
+      ceiling:{ang:1.15, pen:0.7},
+    };
+
     if(effectiveOn) {
       const lm = p.lm * dimLv;
-      const lightY = f.presetId === 'floor_indirect' ? fxH + 0.1 : fxH - 0.08;
-      const ptLight = new THREE.PointLight(0xffd888, lm / 280, 9, 2);
-      ptLight.position.y = lightY;
-      ptLight.castShadow = lm > 800;
-      if(ptLight.castShadow) {
-        ptLight.shadow.mapSize.set(512, 512);
-        ptLight.shadow.radius = 3;
-        ptLight.shadow.camera.near = 0.05;
-        ptLight.shadow.camera.far = 7;
-      }
-      g.add(ptLight);
+      const useSpot = recessed || f.presetId === 'ceiling';
+      if(useSpot) {
+        // 下向きスポット：床・壁・家具にシャープな光だまり（グレアレスの見え方）
+        const sp = SPOT[f.presetId] || {ang:0.6, pen:0.5};
+        const spot = new THREE.SpotLight(0xffd9a0, lm / 70, fxH + 1.6, sp.ang, sp.pen, 2);
+        spot.position.set(0, fxH - 0.02, 0);
+        spot.target.position.set(0, 0, 0);
+        g.add(spot);
+        g.add(spot.target);
+        // 影マップは付けない（多灯でのテクスチャユニット超過・性能低下を回避）。
+        // 家具の接地はコンタクトシャドウで表現。
+      } else {
+        // 露出光源（ペンダント/スタンド）：全方向
+        const lightY = f.presetId === 'floor_indirect' ? fxH + 0.1 : fxH - 0.08;
+        const ptLight = new THREE.PointLight(0xffd888, lm / 280, 9, 2);
+        ptLight.position.y = lightY;
+        ptLight.castShadow = lm > 800;
+        if(ptLight.castShadow) {
+          ptLight.shadow.mapSize.set(512, 512);
+          ptLight.shadow.radius = 3;
+          ptLight.shadow.camera.near = 0.05;
+          ptLight.shadow.camera.far = 7;
+        }
+        g.add(ptLight);
 
-      // Upward light for indirect/floor lamps
-      if(f.presetId === 'floor_indirect') {
-        const upLight = new THREE.PointLight(0xffc870, lm / 600, 6, 2);
-        upLight.position.y = fxH + 0.15;
-        g.add(upLight);
+        if(f.presetId === 'floor_indirect') {
+          const upLight = new THREE.PointLight(0xffc870, lm / 600, 6, 2);
+          upLight.position.y = fxH + 0.15;
+          g.add(upLight);
+        }
       }
     }
 
