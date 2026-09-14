@@ -71,6 +71,31 @@
   .center{text-align:center}
   .mt{margin-top:16px}
   .hidden{display:none}
+
+  /* Mode selection */
+  .modebox{margin-top:20px; border-top:1px solid var(--line); padding-top:18px}
+  .modehd{font-weight:700; margin-bottom:12px; text-align:center; color:var(--muted); font-size:13px; letter-spacing:.06em}
+  .modes{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+  .mode{display:block; background:var(--panel2); border:1px solid var(--line); border-radius:14px; padding:14px; cursor:pointer; transition:border-color .2s, box-shadow .2s}
+  .mode:hover{border-color:var(--accent)}
+  .mode.selected{border-color:var(--accent); box-shadow:0 0 0 2px rgba(108,140,255,.35)}
+  .mode input{display:none}
+  .mtitle{font-weight:800; margin-bottom:6px}
+  .mdesc{color:var(--muted); font-size:13px; line-height:1.5}
+  .eloopts{margin-top:12px; text-align:center; font-size:14px}
+  .eloopts select{background:var(--panel2); color:var(--text); border:1px solid var(--line); border-radius:8px; padding:6px 10px; margin-left:6px}
+  @media(max-width:640px){ .modes{grid-template-columns:1fr} }
+
+  /* Ranking list */
+  .ranklist{display:flex; flex-direction:column; gap:10px; margin-top:16px}
+  .rankrow{display:grid; grid-template-columns:44px 60px 1fr auto; gap:12px; align-items:center;
+    background:var(--panel2); border:1px solid var(--line); border-radius:12px; padding:10px 12px}
+  .rankrow.top1{border-color:var(--win); box-shadow:0 0 0 2px rgba(74,222,128,.35)}
+  .rk{font-size:20px; font-weight:900; text-align:center; color:var(--accent2)}
+  .rankrow img{width:60px; height:46px; object-fit:cover; border-radius:8px; display:block}
+  .rname{font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .rstat{color:var(--muted); font-size:13px; text-align:right; white-space:nowrap}
+  .rstat b{color:var(--text); font-size:15px}
   @media(max-width:640px){
     .match{grid-template-columns:1fr; }
     .vs{transform:rotate(90deg)}
@@ -94,9 +119,36 @@
     </div>
     <div id="thumbs" class="thumbs"></div>
     <div id="count" class="count"></div>
+
+    <div class="modebox">
+      <div class="modehd">投票方式を選ぶ</div>
+      <div class="modes">
+        <label class="mode selected" data-mode="ko">
+          <input type="radio" name="mode" value="ko" checked>
+          <div class="mtitle">🏆 勝ち抜きトーナメント</div>
+          <div class="mdesc">1対1で負けたら即敗退。試合数が少なく手軽（枚数−1試合）。組み合わせ運の影響あり。</div>
+        </label>
+        <label class="mode" data-mode="elo">
+          <input type="radio" name="mode" value="elo">
+          <div class="mtitle">📊 総当たり風ランキング（ELO）</div>
+          <div class="mdesc">近いレート同士で複数試合。全体の順位・レート・勝率が出て公平性が高い。</div>
+        </label>
+      </div>
+      <div id="eloOpts" class="eloopts hidden">
+        <label>1枚あたりの試合数の目安：
+          <select id="roundSel">
+            <option value="3">少なめ（3ラウンド）</option>
+            <option value="5" selected>標準（5ラウンド）</option>
+            <option value="8">多め（8ラウンド・より正確）</option>
+          </select>
+        </label>
+        <div class="hint" id="eloEst"></div>
+      </div>
+    </div>
+
     <div class="row mt">
       <button id="clear" class="btn ghost">すべて削除</button>
-      <button id="start" class="btn" disabled>トーナメント開始</button>
+      <button id="start" class="btn" disabled>開始</button>
     </div>
   </section>
 
@@ -133,6 +185,16 @@
       <button id="reset2" class="btn">新しく作り直す</button>
     </div>
   </section>
+
+  <!-- RANKING RESULT -->
+  <section id="ranking" class="card hidden">
+    <div class="center"><span class="roundtag">最終ランキング（ELOレーティング）</span></div>
+    <div id="rankList" class="ranklist"></div>
+    <div class="row mt">
+      <button id="againR" class="btn secondary">同じ写真でもう一度</button>
+      <button id="resetR" class="btn">新しく作り直す</button>
+    </div>
+  </section>
 </div>
 
 <script>
@@ -143,8 +205,11 @@
   var idSeq = 0;
   var bracket = null;         // トーナメント状態
 
+  var elo = null;             // ELOランキング状態
+  var mode = "ko";            // "ko" | "elo"
+
   var $ = function(id){ return document.getElementById(id); };
-  var setup=$("setup"), arena=$("arena"), result=$("result");
+  var setup=$("setup"), arena=$("arena"), result=$("result"), ranking=$("ranking");
   var drop=$("drop"), fileInput=$("file"), thumbs=$("thumbs"), countEl=$("count"), startBtn=$("start");
 
   // ---- 画像追加 ----
@@ -174,7 +239,28 @@
     countEl.textContent = photos.length + " 枚の写真" +
       (photos.length < 2 ? "（開始には2枚以上必要です）" : "");
     startBtn.disabled = photos.length < 2;
+    updateEstimate();
   }
+
+  // ---- モード選択 ----
+  function updateEstimate(){
+    var r = parseInt($("roundSel").value, 10);
+    var games = Math.round(photos.length * r / 2);
+    $("eloEst").textContent = photos.length >= 2
+      ? "予想試合数：約 " + games + " 試合（" + photos.length + "枚 × " + r + "ラウンド ÷ 2）"
+      : "";
+  }
+  Array.prototype.forEach.call(document.querySelectorAll('input[name="mode"]'), function(radio){
+    radio.addEventListener("change", function(){
+      mode = radio.value;
+      Array.prototype.forEach.call(document.querySelectorAll(".mode"), function(m){
+        m.classList.toggle("selected", m.getAttribute("data-mode") === mode);
+      });
+      $("eloOpts").classList.toggle("hidden", mode !== "elo");
+      startBtn.textContent = mode === "elo" ? "ランキング開始" : "トーナメント開始";
+    });
+  });
+  $("roundSel").addEventListener("change", updateEstimate);
 
   // ドラッグ＆ドロップ / クリック
   drop.addEventListener("click", function(){ fileInput.click(); });
@@ -274,17 +360,133 @@
     show(result);
   }
 
+  // ---- ELOランキング方式 ----
+  var K = 32; // レート変動係数（一般的な標準値）
+
+  function startElo(){
+    var rounds = parseInt($("roundSel").value, 10);
+    elo = {
+      players: photos.map(function(p){
+        return { photo:p, rating:1000, win:0, loss:0, seen:{} };
+      }),
+      matches: [],   // 生成済みの対戦キュー
+      idx: 0
+    };
+    buildEloMatches(rounds);
+    show(arena);
+    nextEloMatch();
+  }
+
+  // スイス式：各ラウンドでレート順に近い相手と当てる
+  function buildEloMatches(rounds){
+    for(var r=0; r<rounds; r++){
+      var pool = elo.players.slice();
+      // 初回はランダム、以降はレート順に整列
+      if(r===0) shuffle(pool);
+      else pool.sort(function(a,b){ return b.rating - a.rating; });
+
+      var used = {};
+      for(var i=0; i<pool.length; i++){
+        var a = pool[i];
+        if(used[a.photo.id]) continue;
+        // まだ当たっていない最も近い相手を探す
+        var partner = null;
+        for(var j=i+1; j<pool.length; j++){
+          var b = pool[j];
+          if(used[b.photo.id]) continue;
+          if(!a.seen[b.photo.id]){ partner = b; break; }
+          if(!partner) partner = b; // 全員対戦済みなら最も近い相手で妥協
+        }
+        if(!partner) continue;
+        used[a.photo.id] = true; used[partner.photo.id] = true;
+        a.seen[partner.photo.id] = true; partner.seen[a.photo.id] = true;
+        elo.matches.push([a, partner]);
+      }
+    }
+    shuffleLightly(elo.matches);
+  }
+
+  // 隣接だけ軽くシャッフル（同じ写真が連続しにくくする）
+  function shuffleLightly(m){
+    for(var i=0;i<m.length-1;i++){
+      var a=m[i];
+      if(m[i+1] && (m[i+1][0]===a[0]||m[i+1][0]===a[1]||m[i+1][1]===a[0]||m[i+1][1]===a[1])){
+        for(var j=i+2;j<m.length;j++){
+          if(m[j][0]!==a[0]&&m[j][0]!==a[1]&&m[j][1]!==a[0]&&m[j][1]!==a[1]){
+            var t=m[i+1]; m[i+1]=m[j]; m[j]=t; break;
+          }
+        }
+      }
+    }
+  }
+
+  function nextEloMatch(){
+    if(elo.idx >= elo.matches.length){ finishElo(); return; }
+    var pair = elo.matches[elo.idx];
+    var a = pair[0], b = pair[1];
+
+    $("roundtag").textContent = "レーティング対戦";
+    var pct = Math.round(elo.idx / elo.matches.length * 100);
+    $("bar").style.width = pct + "%";
+    $("status").textContent = "第 " + (elo.idx+1) + " 試合 / 全 " + elo.matches.length + " 試合　—　良いと思う方をクリック";
+
+    $("imgA").src = a.photo.url; $("capA").textContent = a.photo.name || "候補A";
+    $("imgB").src = b.photo.url; $("capB").textContent = b.photo.name || "候補B";
+    $("cA").classList.remove("chosen"); $("cB").classList.remove("chosen");
+
+    $("cA").onclick = function(){ eloVote(a, b, "cA"); };
+    $("cB").onclick = function(){ eloVote(b, a, "cB"); };
+  }
+
+  function eloVote(winner, loser, elId){
+    $("cA").onclick = null; $("cB").onclick = null;
+    $(elId).classList.add("chosen");
+    // ELO更新
+    var ea = 1 / (1 + Math.pow(10, (loser.rating - winner.rating)/400));
+    var eb = 1 - ea;
+    winner.rating += K * (1 - ea);
+    loser.rating  += K * (0 - eb);
+    winner.win++; loser.loss++;
+    elo.idx++;
+    setTimeout(nextEloMatch, 220);
+  }
+
+  function finishElo(){
+    var ranked = elo.players.slice().sort(function(a,b){ return b.rating - a.rating; });
+    var list = $("rankList");
+    list.innerHTML = "";
+    ranked.forEach(function(p, i){
+      var games = p.win + p.loss;
+      var rate = games ? Math.round(p.win / games * 100) : 0;
+      var row = document.createElement("div");
+      row.className = "rankrow" + (i===0 ? " top1" : "");
+      row.innerHTML =
+        '<div class="rk">' + (i===0?"👑":(i+1)) + '</div>' +
+        '<img alt="">' +
+        '<div class="rname"></div>' +
+        '<div class="rstat"><b>' + Math.round(p.rating) + '</b> pt<br>' +
+          p.win + '勝' + p.loss + '敗（勝率' + rate + '%）</div>';
+      row.querySelector("img").src = p.photo.url;
+      row.querySelector(".rname").textContent = p.photo.name || ("写真" + (i+1));
+      list.appendChild(row);
+    });
+    show(ranking);
+  }
+
   // ---- 画面切替 ----
   function show(sec){
-    [setup, arena, result].forEach(function(s){ s.classList.add("hidden"); });
+    [setup, arena, result, ranking].forEach(function(s){ s.classList.add("hidden"); });
     sec.classList.remove("hidden");
     window.scrollTo({top:0, behavior:"smooth"});
   }
 
-  startBtn.onclick = startTournament;
+  function begin(){ if(mode === "elo") startElo(); else startTournament(); }
+  startBtn.onclick = begin;
   $("reset1").onclick = function(){ show(setup); };
   $("reset2").onclick = function(){ show(setup); };
-  $("again").onclick = startTournament;
+  $("again").onclick = begin;
+  $("againR").onclick = begin;
+  $("resetR").onclick = function(){ show(setup); };
 
   renderThumbs();
 })();
