@@ -84,6 +84,8 @@
   .mdesc{color:var(--muted); font-size:13px; line-height:1.5}
   .eloopts{margin-top:12px; text-align:center; font-size:14px}
   .eloopts select{background:var(--panel2); color:var(--text); border:1px solid var(--line); border-radius:8px; padding:6px 10px; margin-left:6px}
+  .sharebanner{margin-top:14px; padding:12px 14px; border-radius:12px; text-align:center; font-size:14px;
+    background:rgba(74,222,128,.12); border:1px solid rgba(74,222,128,.5); color:var(--text)}
   @media(max-width:640px){ .modes{grid-template-columns:1fr} }
 
   /* Ranking list */
@@ -148,7 +150,14 @@
 
     <div class="row mt">
       <button id="clear" class="btn ghost">すべて削除</button>
+      <button id="export" class="btn secondary" disabled>📤 共有用に書き出す</button>
       <button id="start" class="btn" disabled>開始</button>
+    </div>
+    <div id="exportHint" class="hint" style="text-align:center">
+      「共有用に書き出す」＝写真を埋め込んだHTMLファイルを保存。スマホや家族に送れば、同じ写真で投票できます（オフライン可・アカウント不要）。
+    </div>
+    <div id="shareBanner" class="sharebanner hidden">
+      📥 共有されたファイルを開いています。下の写真セットでそのままトーナメントを始められます。
     </div>
   </section>
 
@@ -239,6 +248,7 @@
     countEl.textContent = photos.length + " 枚の写真" +
       (photos.length < 2 ? "（開始には2枚以上必要です）" : "");
     startBtn.disabled = photos.length < 2;
+    $("export").disabled = photos.length < 1;
     updateEstimate();
   }
 
@@ -478,6 +488,61 @@
     [setup, arena, result, ranking].forEach(function(s){ s.classList.add("hidden"); });
     sec.classList.remove("hidden");
     window.scrollTo({top:0, behavior:"smooth"});
+  }
+
+  // ---- 共有用ファイルの書き出し（写真を埋め込み） ----
+  function blobUrlToDataURL(url){
+    return fetch(url).then(function(r){ return r.blob(); }).then(function(b){
+      return new Promise(function(res, rej){
+        var fr = new FileReader();
+        fr.onload = function(){ res(fr.result); };
+        fr.onerror = rej;
+        fr.readAsDataURL(b);
+      });
+    });
+  }
+
+  function exportShareable(){
+    var btn = $("export");
+    var label = btn.textContent;
+    btn.disabled = true; btn.textContent = "書き出し中…";
+    Promise.all(photos.map(function(p){
+      // data URL はそのまま、blob URL は変換
+      if(/^data:/.test(p.url)) return Promise.resolve({ name:p.name, data:p.url });
+      return blobUrlToDataURL(p.url).then(function(d){ return { name:p.name, data:d }; });
+    })).then(function(items){
+      var clone = document.documentElement.cloneNode(true);
+      var t = clone.querySelector("#thumbs"); if(t) t.innerHTML = "";
+      var old = clone.querySelector("#preload"); if(old) old.parentNode.removeChild(old);
+      // 開始時に見えている画面をリセット（setupだけ表示）
+      ["arena","result","ranking"].forEach(function(id){
+        var el = clone.querySelector("#"+id); if(el && el.className.indexOf("hidden")<0) el.className += " hidden";
+      });
+      var s = clone.ownerDocument.createElement("script");
+      s.id = "preload";
+      s.textContent = "window.__PRELOAD__=" + JSON.stringify(items) + ";";
+      clone.querySelector("head").appendChild(s);
+      var html = "<!DOCTYPE html>\n" + clone.outerHTML;
+      var blob = new Blob([html], { type:"text/html" });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      a.href = url; a.download = "写真トーナメント_共有用.html";
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 5000);
+      btn.disabled = false; btn.textContent = label;
+    }).catch(function(){
+      alert("書き出しに失敗しました。写真を読み込み直してもう一度お試しください。");
+      btn.disabled = false; btn.textContent = label;
+    });
+  }
+  $("export").onclick = exportShareable;
+
+  // 共有ファイルとして開かれたとき：埋め込み写真を読み込む
+  if(window.__PRELOAD__ && window.__PRELOAD__.length){
+    window.__PRELOAD__.forEach(function(it){
+      photos.push({ id: ++idSeq, url: it.data, name: it.name });
+    });
+    $("shareBanner").classList.remove("hidden");
   }
 
   function begin(){ if(mode === "elo") startElo(); else startTournament(); }
