@@ -86,6 +86,24 @@
   .eloopts select{background:var(--panel2); color:var(--text); border:1px solid var(--line); border-radius:8px; padding:6px 10px; margin-left:6px}
   .sharebanner{margin-top:14px; padding:12px 14px; border-radius:12px; text-align:center; font-size:14px;
     background:rgba(74,222,128,.12); border:1px solid rgba(74,222,128,.5); color:var(--text)}
+
+  /* Bracket (トーナメント表) */
+  .bracketwrap{margin-top:22px; border-top:1px solid var(--line); padding-top:16px}
+  .bracket{display:flex; gap:22px; overflow:auto; height:min(52vh,440px); align-items:stretch; padding:8px 4px}
+  .bround{display:flex; flex-direction:column; min-width:148px}
+  .brhd{text-align:center; font-size:12px; font-weight:800; color:var(--muted); letter-spacing:.05em;
+    margin-bottom:8px; position:sticky; top:0; background:var(--panel); padding:2px 0}
+  .brmatches{display:flex; flex-direction:column; justify-content:space-around; flex:1; gap:10px}
+  .bmatch{background:var(--panel2); border:1px solid var(--line); border-radius:10px; padding:4px; display:flex; flex-direction:column; gap:3px}
+  .bmatch.current{border-color:var(--accent2); box-shadow:0 0 0 2px rgba(255,122,182,.5)}
+  .bslot{display:flex; align-items:center; gap:7px; padding:3px 5px; border-radius:6px; font-size:12px; min-height:28px}
+  .bslot img{width:30px; height:23px; object-fit:cover; border-radius:4px; flex:none}
+  .bname{overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .bslot.win{background:rgba(74,222,128,.18); color:var(--win); font-weight:700}
+  .bslot.win::after{content:"✓"; margin-left:auto; color:var(--win)}
+  .bslot.lose{opacity:.45}
+  .bslot.bye{color:var(--muted); font-style:italic}
+  .bslot.tbd{color:var(--muted)}
   @media(max-width:640px){ .modes{grid-template-columns:1fr} }
 
   /* Ranking list */
@@ -176,6 +194,10 @@
         <div class="frame"><img id="imgB" alt="候補B"></div>
         <div class="cap" id="capB"></div>
       </div>
+    </div>
+    <div id="bracketWrap" class="bracketwrap">
+      <div class="center"><span class="roundtag">トーナメント表</span></div>
+      <div id="bracket" class="bracket"></div>
     </div>
     <div class="row mt">
       <button id="reset1" class="btn ghost">中止して最初から</button>
@@ -294,53 +316,96 @@
     return a;
   }
 
+  // 標準ブラケットのシード配置（byeを上位に分散させる）
+  function seedPositions(size){
+    var seeds = [0];
+    while(seeds.length < size){
+      var len = seeds.length * 2, out = [];
+      for(var i=0;i<seeds.length;i++){ out.push(seeds[i]); out.push(len-1-seeds[i]); }
+      seeds = out;
+    }
+    return seeds;
+  }
+
+  function buildBracket(players){
+    var n = players.length;
+    var size = 1; while(size < n) size *= 2;      // 2のべき乗に切り上げ
+    var order = seedPositions(size);
+    var slots = new Array(size);
+    for(var i=0;i<size;i++){
+      var rank = order[i];
+      slots[i] = rank < n ? players[rank] : null; // null = 不戦勝(bye)
+    }
+    var rounds = [], r0 = [];
+    for(var k=0;k<size;k+=2){
+      r0.push({ a:slots[k], b:slots[k+1], winner:undefined, feeders:null });
+    }
+    rounds.push(r0);
+    var prev = r0;
+    while(prev.length > 1){
+      var nx = [];
+      for(var j=0;j<prev.length;j+=2){
+        nx.push({ a:undefined, b:undefined, winner:undefined, feeders:[prev[j], prev[j+1]] });
+      }
+      rounds.push(nx);
+      prev = nx;
+    }
+    return { rounds:rounds, size:size, matchTotal:n-1, matchDone:0, cur:null };
+  }
+
   function startTournament(){
     var players = shuffle(photos.slice());
-    bracket = {
-      current: players,   // 今ラウンドの候補（byeは即通過）
-      next: [],           // 次ラウンドへ勝ち上がった候補
-      idx: 0,             // current内の対戦ペア先頭index
-      roundNo: 1,
-      totalRounds: Math.ceil(Math.log2(players.length)),
-      matchDone: 0,
-      matchTotal: players.length - 1  // 単勝抜けは総試合数 = 人数-1
-    };
+    bracket = buildBracket(players);
+    $("bracketWrap").classList.remove("hidden");
     show(arena);
-    nextMatch();
+    advance();
   }
 
-  function roundName(remaining){
-    if(remaining === 2) return "決勝";
-    if(remaining === 4) return "準決勝";
-    if(remaining === 8) return "準々決勝";
-    return remaining + "人 ラウンド (ラウンド" + bracket.roundNo + ")";
+  function roundName(r){
+    var fromEnd = bracket.rounds.length - 1 - r;
+    if(fromEnd === 0) return "決勝";
+    if(fromEnd === 1) return "準決勝";
+    if(fromEnd === 2) return "準々決勝";
+    return "ラウンド " + (r + 1);
   }
 
-  function nextMatch(){
-    // 現ラウンドを消化しきったら次ラウンドへ
-    if(bracket.idx >= bracket.current.length){
-      bracket.current = bracket.next;
-      bracket.next = [];
-      bracket.idx = 0;
-      bracket.roundNo++;
+  // feederから未確定スロットを埋め、byeを自動処理し、次に投票すべき試合を返す
+  function fillAndFind(){
+    for(var r=0;r<bracket.rounds.length;r++){
+      var round = bracket.rounds[r];
+      for(var m=0;m<round.length;m++){
+        var mt = round[m];
+        if(mt.feeders){
+          if(mt.a===undefined && mt.feeders[0].winner!==undefined) mt.a = mt.feeders[0].winner;
+          if(mt.b===undefined && mt.feeders[1].winner!==undefined) mt.b = mt.feeders[1].winner;
+        }
+        if(mt.winner!==undefined) continue;
+        if(mt.a===undefined || mt.b===undefined) continue; // feeder待ち
+        if(mt.a===null && mt.b===null){ mt.winner = null; continue; }
+        if(mt.a===null){ mt.winner = mt.b; continue; }
+        if(mt.b===null){ mt.winner = mt.a; continue; }
+        return { r:r, m:m, match:mt };  // 実際に投票が必要な試合
+      }
     }
-    // 優勝決定
-    if(bracket.current.length === 1){
-      finish(bracket.current[0]);
+    return null;
+  }
+
+  function advance(){
+    var next = fillAndFind();
+    if(!next){
+      bracket.cur = null;
+      renderBracket();
+      finish(bracket.rounds[bracket.rounds.length-1][0].winner);
       return;
     }
-    // bye（残り1つだけ余る場合）は自動的に次へ
-    if(bracket.idx === bracket.current.length - 1){
-      bracket.next.push(bracket.current[bracket.idx]);
-      bracket.idx++;
-      nextMatch();
-      return;
-    }
+    bracket.cur = next;
+    renderBracket();
+    showMatch(next.match, next.r);
+  }
 
-    var a = bracket.current[bracket.idx];
-    var b = bracket.current[bracket.idx+1];
-
-    $("roundtag").textContent = roundName(bracket.current.length);
+  function showMatch(mt, r){
+    var a = mt.a, b = mt.b;
+    $("roundtag").textContent = roundName(r);
     var pct = bracket.matchTotal ? Math.round(bracket.matchDone / bracket.matchTotal * 100) : 0;
     $("bar").style.width = pct + "%";
     $("status").textContent = "第 " + (bracket.matchDone+1) + " 試合 / 全 " + bracket.matchTotal + " 試合　—　勝った方をクリックして投票";
@@ -349,17 +414,52 @@
     $("imgB").src = b.url; $("capB").textContent = b.name || "候補B";
     $("cA").classList.remove("chosen"); $("cB").classList.remove("chosen");
 
-    $("cA").onclick = function(){ vote(a, "cA"); };
-    $("cB").onclick = function(){ vote(b, "cB"); };
+    $("cA").onclick = function(){ voteKO(mt, a, "cA"); };
+    $("cB").onclick = function(){ voteKO(mt, b, "cB"); };
   }
 
-  function vote(winner, elId){
+  function voteKO(mt, winner, elId){
     $("cA").onclick = null; $("cB").onclick = null;  // 二重投票防止
     $(elId).classList.add("chosen");
-    bracket.next.push(winner);
-    bracket.idx += 2;
+    mt.winner = winner;
     bracket.matchDone++;
-    setTimeout(nextMatch, 260);
+    setTimeout(advance, 260);
+  }
+
+  function brSlot(p, winner){
+    var s = document.createElement("div");
+    s.className = "bslot";
+    if(p === undefined){ s.className += " tbd"; s.textContent = "—"; return s; }
+    if(p === null){ s.className += " bye"; s.textContent = "(不戦勝)"; return s; }
+    var img = document.createElement("img"); img.src = p.url; img.alt = "";
+    var nm = document.createElement("span"); nm.className = "bname"; nm.textContent = p.name || "写真";
+    s.appendChild(img); s.appendChild(nm);
+    if(winner !== undefined && winner !== null){
+      s.className += (winner === p) ? " win" : " lose";
+    }
+    return s;
+  }
+
+  function renderBracket(){
+    var wrap = $("bracket");
+    wrap.innerHTML = "";
+    bracket.rounds.forEach(function(round, r){
+      var col = document.createElement("div"); col.className = "bround";
+      var h = document.createElement("div"); h.className = "brhd"; h.textContent = roundName(r);
+      col.appendChild(h);
+      var box = document.createElement("div"); box.className = "brmatches";
+      round.forEach(function(mt, m){
+        var el = document.createElement("div"); el.className = "bmatch";
+        if(bracket.cur && bracket.cur.r === r && bracket.cur.m === m) el.className += " current";
+        el.appendChild(brSlot(mt.a, mt.winner));
+        el.appendChild(brSlot(mt.b, mt.winner));
+        box.appendChild(el);
+      });
+      col.appendChild(box);
+      wrap.appendChild(col);
+    });
+    var cur = wrap.querySelector(".bmatch.current");
+    if(cur) cur.scrollIntoView({ behavior:"smooth", block:"nearest", inline:"center" });
   }
 
   function finish(champ){
@@ -383,6 +483,7 @@
       idx: 0
     };
     buildEloMatches(rounds);
+    $("bracketWrap").classList.add("hidden");
     show(arena);
     nextEloMatch();
   }
